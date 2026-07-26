@@ -156,6 +156,9 @@ export function renderForecast(report: WeatherForecastOutput, t: TranslateFn, lo
       summary: nonEmpty([
         metricLine(t, locale, 'official.weather.metric.temperatureMax', day.temperatureMax),
         metricLine(t, locale, 'official.weather.metric.temperatureMin', day.temperatureMin),
+        metricLine(t, locale, 'official.weather.metric.relativeHumidityMax', day.relativeHumidityMax),
+        metricLine(t, locale, 'official.weather.metric.relativeHumidityMin', day.relativeHumidityMin),
+        metricLine(t, locale, 'official.weather.metric.relativeHumidityMean', day.relativeHumidityMean),
         metricLine(t, locale, 'official.weather.metric.precipitation', day.precipitationSum),
         metricLine(t, locale, 'official.weather.metric.precipitationProbability', day.precipitationProbabilityMax),
         metricLine(t, locale, 'official.weather.metric.windSpeed', day.windSpeedMax),

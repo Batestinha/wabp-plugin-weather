@@ -258,6 +258,9 @@ function dailyForecastVariables(metrics: WeatherMetricFlags): string[] {
   return [
     ...(metrics.weatherCode ? ['weather_code'] : []),
     ...(metrics.temperature ? ['temperature_2m_max', 'temperature_2m_min'] : []),
+    ...(metrics.relativeHumidity
+      ? ['relative_humidity_2m_max', 'relative_humidity_2m_min', 'relative_humidity_2m_mean']
+      : []),
     ...(metrics.precipitation ? ['precipitation_sum', 'precipitation_probability_max'] : []),
     ...(metrics.wind ? ['wind_speed_10m_max', 'wind_gusts_10m_max', 'wind_direction_10m_dominant'] : [])
   ];
@@ -374,6 +377,9 @@ function forecastDays(response: JsonRecord): WeatherForecastOutput['days'] {
     ...numberFieldAt(daily, 'weather_code', 'weatherCode', index),
     ...metricAt(daily, units, 'temperature_2m_max', 'temperatureMax', index),
     ...metricAt(daily, units, 'temperature_2m_min', 'temperatureMin', index),
+    ...metricAt(daily, units, 'relative_humidity_2m_max', 'relativeHumidityMax', index),
+    ...metricAt(daily, units, 'relative_humidity_2m_min', 'relativeHumidityMin', index),
+    ...metricAt(daily, units, 'relative_humidity_2m_mean', 'relativeHumidityMean', index),
     ...metricAt(daily, units, 'precipitation_sum', 'precipitationSum', index),
     ...metricAt(daily, units, 'precipitation_probability_max', 'precipitationProbabilityMax', index),
     ...metricAt(daily, units, 'wind_speed_10m_max', 'windSpeedMax', index),
