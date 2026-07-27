@@ -5,17 +5,35 @@ import {
   WEATHER_WIND_SPEED_UNITS
 } from './config';
 
-export const WEATHER_SERVICE_ID = 'official.weather.v1';
-export const WEATHER_CURRENT_METHOD = 'current';
-export const WEATHER_FORECAST_METHOD = 'forecast';
-export const WEATHER_MARINE_METHOD = 'marine';
+export const WEATHER_SERVICE_ID = 'official.weather.v2';
+export const WEATHER_QUERY_METHOD = 'query';
+export const WEATHER_MAX_FORECAST_DAYS = 16;
+export const WEATHER_MAX_DAY_OFFSET = WEATHER_MAX_FORECAST_DAYS - 1;
 
 export const weatherServiceLocationSchema = z.object({
-  label: z.string().trim().min(1),
-  latitude: z.number().min(-90).max(90),
-  longitude: z.number().min(-180).max(180),
-  timezone: z.string().trim().min(1)
+  label: z.string().trim().min(1).max(2048),
+  latitude: z.number().finite().min(-90).max(90),
+  longitude: z.number().finite().min(-180).max(180),
+  timezone: z.string().trim().min(1).max(128)
 }).strict();
+
+export const weatherQueryLocationSchema = z.union([
+  z.string().trim().min(2).max(256),
+  weatherServiceLocationSchema
+]);
+
+export const weatherDaySelectionSchema = z.object({
+  startDay: z.number().int().min(0).max(WEATHER_MAX_DAY_OFFSET),
+  endDay: z.number().int().min(0).max(WEATHER_MAX_DAY_OFFSET)
+}).strict().superRefine((selection, context) => {
+  if (selection.startDay > selection.endDay) {
+    context.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['startDay'],
+      message: 'startDay must not be greater than endDay'
+    });
+  }
+});
 
 export const weatherServiceMetricOverridesSchema = z.object({
   temperature: z.boolean().optional(),
@@ -30,22 +48,13 @@ export const weatherServiceMetricOverridesSchema = z.object({
   seaSurfaceTemperature: z.boolean().optional()
 }).strict();
 
-export const weatherCurrentInputSchema = z.object({
-  location: weatherServiceLocationSchema.optional(),
-  metrics: weatherServiceMetricOverridesSchema.optional(),
-  includeMarine: z.boolean().optional()
-}).strict().default({});
-
-export const weatherForecastInputSchema = z.object({
-  location: weatherServiceLocationSchema.optional(),
-  metrics: weatherServiceMetricOverridesSchema.optional(),
-  days: z.number().int().min(1).max(16).optional()
-}).strict().default({});
-
-export const weatherMarineInputSchema = z.object({
-  location: weatherServiceLocationSchema.optional(),
+export const weatherQueryInputSchema = z.object({
+  location: weatherQueryLocationSchema,
+  selection: weatherDaySelectionSchema.optional(),
+  language: z.string().trim().min(2).max(35).optional(),
+  includeMarine: z.boolean().default(false),
   metrics: weatherServiceMetricOverridesSchema.optional()
-}).strict().default({});
+}).strict();
 
 export const weatherMetricValueSchema = z.object({
   value: z.number(),
@@ -65,12 +74,7 @@ export const weatherTideEventSchema = z.object({
   height: weatherMetricValueSchema
 }).strict();
 
-export const weatherReportLocationSchema = z.object({
-  label: z.string(),
-  latitude: z.number(),
-  longitude: z.number(),
-  timezone: z.string()
-}).strict();
+export const weatherReportLocationSchema = weatherServiceLocationSchema;
 
 export const weatherReportUnitsSchema = z.object({
   temperatureUnit: z.enum(WEATHER_TEMPERATURE_UNITS),
@@ -90,24 +94,12 @@ export const weatherCurrentConditionsSchema = z.object({
   windGusts10m: weatherMetricValueSchema.optional()
 }).strict();
 
-export const weatherMarineConditionsSchema = z.object({
-  time: z.string(),
-  seaLevelHeightMsl: weatherMetricValueSchema.optional(),
-  waveHeight: weatherMetricValueSchema.optional(),
-  waveDirection: weatherMetricValueSchema.optional(),
-  wavePeriod: weatherMetricValueSchema.optional(),
-  oceanCurrentVelocity: weatherMetricValueSchema.optional(),
-  oceanCurrentDirection: weatherMetricValueSchema.optional(),
-  seaSurfaceTemperature: weatherMetricValueSchema.optional()
-}).strict();
-
-export const weatherCurrentOutputSchema = z.object({
+export const weatherCurrentReportSchema = z.object({
   provider: z.literal('open-meteo'),
   fetchedAt: z.string(),
   location: weatherReportLocationSchema,
   units: weatherReportUnitsSchema,
-  current: weatherCurrentConditionsSchema,
-  marine: weatherMarineConditionsSchema.optional()
+  current: weatherCurrentConditionsSchema
 }).strict();
 
 export const weatherForecastDaySchema = z.object({
@@ -138,7 +130,7 @@ export const weatherForecastDaySchema = z.object({
   }).strict().optional()
 }).strict();
 
-export const weatherForecastOutputSchema = z.object({
+export const weatherForecastReportSchema = z.object({
   provider: z.literal('open-meteo'),
   fetchedAt: z.string(),
   location: weatherReportLocationSchema,
@@ -146,20 +138,24 @@ export const weatherForecastOutputSchema = z.object({
   days: z.array(weatherForecastDaySchema)
 }).strict();
 
-export const weatherMarineOutputSchema = z.object({
-  provider: z.literal('open-meteo'),
-  fetchedAt: z.string(),
-  location: weatherReportLocationSchema,
-  units: weatherReportUnitsSchema,
-  marine: weatherMarineConditionsSchema
-}).strict();
+export const weatherQueryOutputSchema = z.discriminatedUnion('kind', [
+  z.object({
+    kind: z.literal('current'),
+    report: weatherCurrentReportSchema
+  }).strict(),
+  z.object({
+    kind: z.literal('forecast'),
+    selection: weatherDaySelectionSchema,
+    report: weatherForecastReportSchema
+  }).strict()
+]);
 
-export type WeatherCurrentInput = z.infer<typeof weatherCurrentInputSchema>;
-export type WeatherForecastInput = z.infer<typeof weatherForecastInputSchema>;
-export type WeatherMarineInput = z.infer<typeof weatherMarineInputSchema>;
+export type WeatherServiceLocation = z.infer<typeof weatherServiceLocationSchema>;
+export type WeatherDaySelection = z.infer<typeof weatherDaySelectionSchema>;
+export type WeatherQueryInput = z.infer<typeof weatherQueryInputSchema>;
 export type WeatherMetricValue = z.infer<typeof weatherMetricValueSchema>;
 export type WeatherMarineMetricKey = z.infer<typeof weatherMarineMetricKeySchema>;
 export type WeatherTideEvent = z.infer<typeof weatherTideEventSchema>;
-export type WeatherCurrentOutput = z.infer<typeof weatherCurrentOutputSchema>;
-export type WeatherForecastOutput = z.infer<typeof weatherForecastOutputSchema>;
-export type WeatherMarineOutput = z.infer<typeof weatherMarineOutputSchema>;
+export type WeatherCurrentOutput = z.infer<typeof weatherCurrentReportSchema>;
+export type WeatherForecastOutput = z.infer<typeof weatherForecastReportSchema>;
+export type WeatherQueryOutput = z.infer<typeof weatherQueryOutputSchema>;

@@ -2,9 +2,7 @@ import type { PluginManifest } from '../../../platform/pluginRuntime/manifest';
 import { weatherConfigSchema } from './config';
 import { weatherMessages } from './messages';
 import {
-  WEATHER_CURRENT_METHOD,
-  WEATHER_FORECAST_METHOD,
-  WEATHER_MARINE_METHOD,
+  WEATHER_QUERY_METHOD,
   WEATHER_SERVICE_ID
 } from './serviceApi';
 
@@ -13,29 +11,19 @@ export const WEATHER_PLUGIN_ID = 'official.weather';
 export const weatherManifest: PluginManifest = {
   pluginId: WEATHER_PLUGIN_ID,
   kind: 'managed_group',
-  version: '0.3.0',
+  version: '0.4.0',
   coreApiRange: '>=0.2.0',
   messageNamespace: 'official.weather',
   descriptionKey: 'official.weather.description',
   defaultMessages: weatherMessages,
-  commands: [],
+  commands: ['/weather'],
   eventSubscriptions: [],
   services: [{
     serviceId: WEATHER_SERVICE_ID,
-    methods: [
-      {
-        name: WEATHER_CURRENT_METHOD,
-        access: 'read'
-      },
-      {
-        name: WEATHER_FORECAST_METHOD,
-        access: 'read'
-      },
-      {
-        name: WEATHER_MARINE_METHOD,
-        access: 'read'
-      }
-    ]
+    methods: [{
+      name: WEATHER_QUERY_METHOD,
+      access: 'read'
+    }]
   }],
   requiredPermissions: [],
   requiredBotCapabilities: [],
@@ -43,14 +31,24 @@ export const weatherManifest: PluginManifest = {
   dangerousActions: [],
   backgroundJobs: [],
   cancellation: { workflows: [] },
+  dependencies: [
+    { pluginId: 'official.geocoder', versionRange: '>=0.1.0' }
+  ],
   assistant: {
-    summary: 'Normalized weather, forecast, tide, wind, humidity, and marine-condition data for other plugins.',
+    summary: 'Location-based current weather and forecasts through one command and one unified query service.',
     useCases: [
-      'Expose normalized weather and marine data for other plugins through a versioned service API.'
+      'Show current weather for a named location.',
+      'Show one forecast day or an inclusive forecast range up to 15 days ahead.',
+      'Expose the same normalized weather query used by /weather to other plugins.'
     ],
     prerequisites: [
       'The plugin must be enabled for the target scope.',
-      'The operator must configure the location and the metrics that should be reported.'
-    ]
+      'official.geocoder must be installed and enabled for named-location lookups.'
+    ],
+    workflows: [{
+      intent: 'weather_query',
+      description: 'Show current weather or a selected forecast day range for a named location.',
+      commands: ['/weather']
+    }]
   }
 };

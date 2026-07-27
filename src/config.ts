@@ -5,15 +5,6 @@ export const WEATHER_TEMPERATURE_UNITS = ['celsius', 'fahrenheit'] as const;
 export const WEATHER_WIND_SPEED_UNITS = ['kmh', 'mph', 'ms', 'kn'] as const;
 export const WEATHER_PRECIPITATION_UNITS = ['mm', 'inch'] as const;
 
-export const weatherLocationShapeSchema = z.object({
-  label: z.string().trim().min(1).default('Lisbon'),
-  latitude: z.number().min(-90).max(90).default(38.7223),
-  longitude: z.number().min(-180).max(180).default(-9.1393),
-  timezone: z.string().trim().min(1).default('Europe/Lisbon')
-});
-
-export const weatherLocationSchema = weatherLocationShapeSchema.default({});
-
 export const weatherUnitsSchema = z.object({
   temperatureUnit: z.enum(WEATHER_TEMPERATURE_UNITS).default('celsius'),
   windSpeedUnit: z.enum(WEATHER_WIND_SPEED_UNITS).default('kmh'),
@@ -46,15 +37,12 @@ export const weatherConfigSchema = z.object({
   enabled: z.boolean().default(true),
   provider: z.enum(WEATHER_PROVIDERS).default('open-meteo'),
   cacheTtlSeconds: z.number().int().min(0).max(3600).default(600),
-  forecastDays: z.number().int().min(1).max(16).default(3),
-  location: weatherLocationSchema,
   units: weatherUnitsSchema,
   metrics: weatherMetricFlagsSchema,
   providerSettings: weatherProviderSettingsSchema
 }).default({});
 
 export type WeatherConfig = z.infer<typeof weatherConfigSchema>;
-export type WeatherLocation = z.infer<typeof weatherLocationSchema>;
 export type WeatherUnits = z.infer<typeof weatherUnitsSchema>;
 export type WeatherMetricFlags = z.infer<typeof weatherMetricFlagsSchema>;
 

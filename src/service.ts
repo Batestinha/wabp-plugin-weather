@@ -1,28 +1,30 @@
 import { createHash } from 'node:crypto';
 import type { PluginEphemeralStore } from '../../../platform/pluginRuntime/runtime/pluginEphemeralStore';
-import type { PluginServiceRegistration } from '../../../platform/pluginRuntime/pluginServices';
+import type {
+  PluginServiceCallContext,
+  PluginServiceRegistration
+} from '../../../platform/pluginRuntime/pluginServices';
 import type { PluginServiceRegistrationContext } from '../../../platform/pluginRuntime/types';
-import { parseWeatherConfig, type WeatherConfig, type WeatherLocation, type WeatherMetricFlags } from './config';
 import {
-  WEATHER_CURRENT_METHOD,
-  WEATHER_FORECAST_METHOD,
-  WEATHER_MARINE_METHOD,
+  GEOCODER_GEOCODE_METHOD,
+  GEOCODER_SERVICE_ID,
+  type GeocodeOutput
+} from '../geocoder/serviceApi';
+import { parseWeatherConfig, type WeatherConfig, type WeatherMetricFlags } from './config';
+import {
+  WEATHER_QUERY_METHOD,
   WEATHER_SERVICE_ID,
-  type WeatherCurrentInput,
   type WeatherCurrentOutput,
-  type WeatherForecastInput,
+  type WeatherDaySelection,
   type WeatherForecastOutput,
   type WeatherMarineMetricKey,
-  type WeatherMarineInput,
-  type WeatherMarineOutput,
   type WeatherMetricValue,
+  type WeatherQueryInput,
+  type WeatherQueryOutput,
+  type WeatherServiceLocation,
   type WeatherTideEvent,
-  weatherCurrentInputSchema,
-  weatherCurrentOutputSchema,
-  weatherForecastInputSchema,
-  weatherForecastOutputSchema,
-  weatherMarineInputSchema,
-  weatherMarineOutputSchema
+  weatherQueryInputSchema,
+  weatherQueryOutputSchema
 } from './serviceApi';
 
 type JsonRecord = Record<string, unknown>;
@@ -33,54 +35,46 @@ type WeatherMetricOverrides = {
 export function registerWeatherServices(context: PluginServiceRegistrationContext): PluginServiceRegistration[] {
   return [{
     serviceId: WEATHER_SERVICE_ID,
-    methods: [
-      {
-        name: WEATHER_CURRENT_METHOD,
-        access: 'read',
-        inputSchema: weatherCurrentInputSchema,
-        outputSchema: weatherCurrentOutputSchema,
-        async handler(rawInput, call) {
-          const input = rawInput as WeatherCurrentInput;
-          const config = parseWeatherConfig(await context.configFor(call.scopeId, call.actorWid));
-          assertWeatherEnabled(config);
-          const metrics = mergeMetrics(config, input.metrics);
-          const includeMarine = input.includeMarine ?? hasMarineMetrics(metrics);
-          return cached(context.ephemeralStore, config, 'current', { input, metrics, includeMarine }, () =>
-            fetchCurrentWeather({ config, input, metrics, includeMarine, signal: call.signal })
-          );
-        }
-      },
-      {
-        name: WEATHER_FORECAST_METHOD,
-        access: 'read',
-        inputSchema: weatherForecastInputSchema,
-        outputSchema: weatherForecastOutputSchema,
-        async handler(rawInput, call) {
-          const input = rawInput as WeatherForecastInput;
-          const config = parseWeatherConfig(await context.configFor(call.scopeId, call.actorWid));
-          assertWeatherEnabled(config);
-          const metrics = mergeMetrics(config, input.metrics);
-          return cached(context.ephemeralStore, config, 'forecast', { input, metrics }, () =>
-            fetchWeatherForecast({ config, input, metrics, signal: call.signal })
-          );
-        }
-      },
-      {
-        name: WEATHER_MARINE_METHOD,
-        access: 'read',
-        inputSchema: weatherMarineInputSchema,
-        outputSchema: weatherMarineOutputSchema,
-        async handler(rawInput, call) {
-          const input = rawInput as WeatherMarineInput;
-          const config = parseWeatherConfig(await context.configFor(call.scopeId, call.actorWid));
-          assertWeatherEnabled(config);
-          const metrics = mergeMetrics(config, marineMetricOverrides(input.metrics));
-          return cached(context.ephemeralStore, config, 'marine', { input, metrics }, () =>
-            fetchMarineWeather({ config, input, metrics, signal: call.signal })
-          );
-        }
+    methods: [{
+      name: WEATHER_QUERY_METHOD,
+      access: 'read',
+      inputSchema: weatherQueryInputSchema,
+      outputSchema: weatherQueryOutputSchema,
+      async handler(rawInput, call) {
+        const input = rawInput as WeatherQueryInput;
+        const config = parseWeatherConfig(await context.configFor(call.scopeId, call.actorWid));
+        assertWeatherEnabled(config);
+        const location = await resolveQueryLocation(context, input, call);
+        const metrics = queryMetrics(config, input);
+        return cached(context.ephemeralStore, config, 'query', {
+          input: { ...input, location },
+          metrics
+        }, async (): Promise<WeatherQueryOutput> => {
+          if (!input.selection) {
+            return {
+              kind: 'current',
+              report: await fetchCurrentWeather({
+                config,
+                location,
+                metrics,
+                signal: call.signal
+              })
+            };
+          }
+          return {
+            kind: 'forecast',
+            selection: input.selection,
+            report: await fetchWeatherForecast({
+              config,
+              location,
+              metrics,
+              selection: input.selection,
+              signal: call.signal
+            })
+          };
+        });
       }
-    ]
+    }]
   }];
 }
 
@@ -95,50 +89,39 @@ function assertWeatherEnabled(config: WeatherConfig): void {
 
 async function fetchCurrentWeather(input: {
   config: WeatherConfig;
-  input: WeatherCurrentInput;
+  location: WeatherServiceLocation;
   metrics: WeatherMetricFlags;
-  includeMarine: boolean;
   signal?: AbortSignal | undefined;
 }): Promise<WeatherCurrentOutput> {
-  const location = resolveLocation(input.config, input.input.location);
   const forecastVariables = currentForecastVariables(input.metrics);
   const forecastJson = await fetchJson(forecastUrl({
     config: input.config,
-    location,
+    location: input.location,
     current: fallbackVariables(forecastVariables, ['weather_code']),
     forecastDays: 1
   }), input.signal);
   const current = currentConditions(forecastJson);
-  const marine = input.includeMarine
-    ? (await fetchMarineWeather({
-        config: input.config,
-        input: { location: input.input.location },
-        metrics: input.metrics,
-        signal: input.signal
-      })).marine
-    : undefined;
 
   return {
     provider: 'open-meteo',
     fetchedAt: new Date().toISOString(),
-    location,
+    location: input.location,
     units: input.config.units,
-    current,
-    ...(marine ? { marine } : {})
+    current
   };
 }
 
 async function fetchWeatherForecast(input: {
   config: WeatherConfig;
-  input: WeatherForecastInput;
+  location: WeatherServiceLocation;
   metrics: WeatherMetricFlags;
+  selection: WeatherDaySelection;
   signal?: AbortSignal | undefined;
 }): Promise<WeatherForecastOutput> {
-  const location = resolveLocation(input.config, input.input.location);
-  const days = input.input.days ?? input.config.forecastDays;
+  const days = input.selection.endDay + 1;
   const forecastJson = await fetchJson(forecastUrl({
     config: input.config,
-    location,
+    location: input.location,
     daily: fallbackVariables(dailyForecastVariables(input.metrics), ['weather_code']),
     forecastDays: days
   }), input.signal);
@@ -149,7 +132,7 @@ async function fetchWeatherForecast(input: {
     try {
       const marineJson = await fetchJson(marineForecastUrl({
         config: input.config,
-        location,
+        location: input.location,
         metrics: input.metrics,
         forecastDays: days
       }), input.signal);
@@ -164,33 +147,12 @@ async function fetchWeatherForecast(input: {
   return {
     provider: 'open-meteo',
     fetchedAt: new Date().toISOString(),
-    location,
+    location: input.location,
     units: input.config.units,
-    days: forecast.map((day) => ({
+    days: forecast.slice(input.selection.startDay, input.selection.endDay + 1).map((day) => ({
       ...day,
       ...(marineByDate.get(day.date) ? { marine: marineByDate.get(day.date)! } : {})
     }))
-  };
-}
-
-async function fetchMarineWeather(input: {
-  config: WeatherConfig;
-  input: WeatherMarineInput | Pick<WeatherCurrentInput, 'location'>;
-  metrics: WeatherMetricFlags;
-  signal?: AbortSignal | undefined;
-}): Promise<WeatherMarineOutput> {
-  const location = resolveLocation(input.config, input.input.location);
-  const marineJson = await fetchJson(marineUrl({
-    config: input.config,
-    location,
-    current: fallbackVariables(marineVariables(input.metrics), ['sea_level_height_msl'])
-  }), input.signal);
-  return {
-    provider: 'open-meteo',
-    fetchedAt: new Date().toISOString(),
-    location,
-    units: input.config.units,
-    marine: marineConditions(marineJson)
   };
 }
 
@@ -220,11 +182,52 @@ function hash(input: unknown): string {
   return createHash('sha256').update(JSON.stringify(input)).digest('hex').slice(0, 24);
 }
 
-function resolveLocation(
-  config: WeatherConfig,
-  override: WeatherCurrentInput['location']
-): WeatherLocation {
-  return override ?? config.location;
+async function resolveQueryLocation(
+  context: PluginServiceRegistrationContext,
+  input: WeatherQueryInput,
+  call: PluginServiceCallContext
+): Promise<WeatherServiceLocation> {
+  if (typeof input.location !== 'string') {
+    return input.location;
+  }
+  if (!context.services) {
+    throw new Error('Location lookup is unavailable.');
+  }
+  const geocoded = await context.services.call<GeocodeOutput>({
+    serviceId: GEOCODER_SERVICE_ID,
+    method: GEOCODER_GEOCODE_METHOD,
+    scopeId: call.scopeId,
+    ...(call.actorWid ? { actorWid: call.actorWid } : {}),
+    ...(call.groupId ? { groupId: call.groupId } : {}),
+    ...(call.groupWid ? { groupWid: call.groupWid } : {}),
+    input: {
+      query: input.location,
+      ...(input.language ? { language: input.language } : {}),
+      limit: 1
+    },
+    ...(call.signal ? { signal: call.signal } : {})
+  });
+  const place = geocoded.results[0];
+  if (!place) {
+    throw new Error(`No location found for "${input.location}".`);
+  }
+  return {
+    label: place.label,
+    latitude: place.point.latitude,
+    longitude: place.point.longitude,
+    timezone: 'auto'
+  };
+}
+
+function queryMetrics(config: WeatherConfig, input: WeatherQueryInput): WeatherMetricFlags {
+  const metrics = mergeMetrics(config, input.metrics);
+  if (!input.includeMarine) {
+    metrics.tide = false;
+    metrics.wave = false;
+    metrics.oceanCurrent = false;
+    metrics.seaSurfaceTemperature = false;
+  }
+  return metrics;
 }
 
 function mergeMetrics(config: WeatherConfig, overrides?: WeatherMetricOverrides | undefined): WeatherMetricFlags {
@@ -235,30 +238,6 @@ function mergeMetrics(config: WeatherConfig, overrides?: WeatherMetricOverrides 
     }
   }
   return next;
-}
-
-function marineMetricOverrides(overrides?: WeatherMetricOverrides | undefined): WeatherMetricOverrides {
-  return {
-    tide: true,
-    wave: true,
-    oceanCurrent: true,
-    seaSurfaceTemperature: true,
-    ...definedMetricOverrides(overrides)
-  };
-}
-
-function definedMetricOverrides(overrides?: WeatherMetricOverrides | undefined): WeatherMetricOverrides {
-  const next: WeatherMetricOverrides = {};
-  for (const [key, value] of Object.entries(overrides ?? {})) {
-    if (typeof value === 'boolean') {
-      next[key as keyof WeatherMetricFlags] = value;
-    }
-  }
-  return next;
-}
-
-function hasMarineMetrics(metrics: WeatherMetricFlags): boolean {
-  return metrics.tide || metrics.wave || metrics.oceanCurrent || metrics.seaSurfaceTemperature;
 }
 
 function currentForecastVariables(metrics: WeatherMetricFlags): string[] {
@@ -284,15 +263,6 @@ function dailyForecastVariables(metrics: WeatherMetricFlags): string[] {
   ];
 }
 
-function marineVariables(metrics: WeatherMetricFlags): string[] {
-  return [
-    ...(metrics.tide ? ['sea_level_height_msl'] : []),
-    ...(metrics.wave ? ['wave_height', 'wave_direction', 'wave_period'] : []),
-    ...(metrics.oceanCurrent ? ['ocean_current_velocity', 'ocean_current_direction'] : []),
-    ...(metrics.seaSurfaceTemperature ? ['sea_surface_temperature'] : [])
-  ];
-}
-
 function marineMetricKeys(metrics: WeatherMetricFlags): WeatherMarineMetricKey[] {
   return [
     ...(metrics.tide ? ['tide' as const] : []),
@@ -308,7 +278,7 @@ function fallbackVariables(values: string[], fallback: string[]): string[] {
 
 function forecastUrl(input: {
   config: WeatherConfig;
-  location: WeatherLocation;
+  location: WeatherServiceLocation;
   current?: string[] | undefined;
   daily?: string[] | undefined;
   forecastDays: number;
@@ -336,25 +306,9 @@ function forecastUrl(input: {
   return url.toString();
 }
 
-function marineUrl(input: {
-  config: WeatherConfig;
-  location: WeatherLocation;
-  current: string[];
-}): string {
-  const url = new URL(input.config.providerSettings.openMeteo.marineBaseUrl);
-  url.searchParams.set('latitude', String(input.location.latitude));
-  url.searchParams.set('longitude', String(input.location.longitude));
-  url.searchParams.set('timezone', input.location.timezone);
-  url.searchParams.set('current', input.current.join(','));
-  if (input.config.units.windSpeedUnit !== 'kmh') {
-    url.searchParams.set('wind_speed_unit', input.config.units.windSpeedUnit);
-  }
-  return url.toString();
-}
-
 function marineForecastUrl(input: {
   config: WeatherConfig;
-  location: WeatherLocation;
+  location: WeatherServiceLocation;
   metrics: WeatherMetricFlags;
   forecastDays: number;
 }): string {
@@ -414,21 +368,6 @@ function currentConditions(response: JsonRecord): WeatherCurrentOutput['current'
     ...metric(current, units, 'wind_speed_10m', 'windSpeed10m'),
     ...metric(current, units, 'wind_direction_10m', 'windDirection10m'),
     ...metric(current, units, 'wind_gusts_10m', 'windGusts10m')
-  };
-}
-
-function marineConditions(response: JsonRecord): WeatherMarineOutput['marine'] {
-  const current = record(response.current);
-  const units = record(response.current_units);
-  return {
-    time: stringValue(current.time, 'unknown'),
-    ...metric(current, units, 'sea_level_height_msl', 'seaLevelHeightMsl'),
-    ...metric(current, units, 'wave_height', 'waveHeight'),
-    ...metric(current, units, 'wave_direction', 'waveDirection'),
-    ...metric(current, units, 'wave_period', 'wavePeriod'),
-    ...metric(current, units, 'ocean_current_velocity', 'oceanCurrentVelocity'),
-    ...metric(current, units, 'ocean_current_direction', 'oceanCurrentDirection'),
-    ...metric(current, units, 'sea_surface_temperature', 'seaSurfaceTemperature')
   };
 }
 
