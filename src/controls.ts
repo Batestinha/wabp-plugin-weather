@@ -108,7 +108,7 @@ export const weatherControls: ControlDescriptor[] = [
   control('metrics.wind', 'Wind', 'Include wind speed, direction, and gust metrics.', 330, { type: 'boolean' }, { widget: 'toggle' }, 'Weather metrics'),
   control('metrics.precipitation', 'Precipitation', 'Include current precipitation and daily precipitation forecast metrics.', 340, { type: 'boolean' }, { widget: 'toggle' }, 'Weather metrics'),
   control('metrics.weatherCode', 'Weather code', 'Include provider weather condition codes.', 350, { type: 'boolean' }, { widget: 'toggle' }, 'Weather metrics'),
-  control('metrics.tide', 'Tide / sea level', 'Include sea-level height from the marine provider as the tide-related metric.', 360, { type: 'boolean' }, { widget: 'toggle' }, 'Marine metrics'),
+  control('metrics.tide', 'Tide / sea level', 'Include current sea-level height and forecast high/low tide times from the marine provider.', 360, { type: 'boolean' }, { widget: 'toggle' }, 'Marine metrics'),
   control('metrics.wave', 'Wave', 'Include wave height, direction, and period from the marine provider.', 370, { type: 'boolean' }, { widget: 'toggle' }, 'Marine metrics'),
   control('metrics.oceanCurrent', 'Ocean current', 'Include ocean current speed and direction from the marine provider.', 380, { type: 'boolean' }, { widget: 'toggle' }, 'Marine metrics'),
   control('metrics.seaSurfaceTemperature', 'Sea temperature', 'Include sea surface temperature from the marine provider.', 390, { type: 'boolean' }, { widget: 'toggle' }, 'Marine metrics'),
