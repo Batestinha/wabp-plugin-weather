@@ -52,6 +52,19 @@ export const weatherMetricValueSchema = z.object({
   unit: z.string()
 }).strict();
 
+export const weatherMarineMetricKeySchema = z.enum([
+  'tide',
+  'wave',
+  'oceanCurrent',
+  'seaSurfaceTemperature'
+]);
+
+export const weatherTideEventSchema = z.object({
+  type: z.enum(['high', 'low']),
+  time: z.string(),
+  height: weatherMetricValueSchema
+}).strict();
+
 export const weatherReportLocationSchema = z.object({
   label: z.string(),
   latitude: z.number(),
@@ -109,7 +122,20 @@ export const weatherForecastDaySchema = z.object({
   precipitationProbabilityMax: weatherMetricValueSchema.optional(),
   windSpeedMax: weatherMetricValueSchema.optional(),
   windGustsMax: weatherMetricValueSchema.optional(),
-  windDirectionDominant: weatherMetricValueSchema.optional()
+  windDirectionDominant: weatherMetricValueSchema.optional(),
+  marine: z.object({
+    requested: z.array(weatherMarineMetricKeySchema),
+    unavailable: z.array(weatherMarineMetricKeySchema),
+    tideEvents: z.array(weatherTideEventSchema),
+    waveHeightMax: weatherMetricValueSchema.optional(),
+    waveDirectionDominant: weatherMetricValueSchema.optional(),
+    wavePeriodMax: weatherMetricValueSchema.optional(),
+    oceanCurrentTime: z.string().optional(),
+    oceanCurrentVelocityMax: weatherMetricValueSchema.optional(),
+    oceanCurrentDirectionAtMax: weatherMetricValueSchema.optional(),
+    seaSurfaceTemperatureMin: weatherMetricValueSchema.optional(),
+    seaSurfaceTemperatureMax: weatherMetricValueSchema.optional()
+  }).strict().optional()
 }).strict();
 
 export const weatherForecastOutputSchema = z.object({
@@ -132,6 +158,8 @@ export type WeatherCurrentInput = z.infer<typeof weatherCurrentInputSchema>;
 export type WeatherForecastInput = z.infer<typeof weatherForecastInputSchema>;
 export type WeatherMarineInput = z.infer<typeof weatherMarineInputSchema>;
 export type WeatherMetricValue = z.infer<typeof weatherMetricValueSchema>;
+export type WeatherMarineMetricKey = z.infer<typeof weatherMarineMetricKeySchema>;
+export type WeatherTideEvent = z.infer<typeof weatherTideEventSchema>;
 export type WeatherCurrentOutput = z.infer<typeof weatherCurrentOutputSchema>;
 export type WeatherForecastOutput = z.infer<typeof weatherForecastOutputSchema>;
 export type WeatherMarineOutput = z.infer<typeof weatherMarineOutputSchema>;

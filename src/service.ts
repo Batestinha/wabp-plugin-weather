@@ -12,9 +12,11 @@ import {
   type WeatherCurrentOutput,
   type WeatherForecastInput,
   type WeatherForecastOutput,
+  type WeatherMarineMetricKey,
   type WeatherMarineInput,
   type WeatherMarineOutput,
   type WeatherMetricValue,
+  type WeatherTideEvent,
   weatherCurrentInputSchema,
   weatherCurrentOutputSchema,
   weatherForecastInputSchema,
@@ -140,12 +142,34 @@ async function fetchWeatherForecast(input: {
     daily: fallbackVariables(dailyForecastVariables(input.metrics), ['weather_code']),
     forecastDays: days
   }), input.signal);
+  const forecast = forecastDays(forecastJson);
+  const requestedMarineMetrics = marineMetricKeys(input.metrics);
+  let marineByDate = new Map<string, NonNullable<WeatherForecastOutput['days'][number]['marine']>>();
+  if (requestedMarineMetrics.length > 0) {
+    try {
+      const marineJson = await fetchJson(marineForecastUrl({
+        config: input.config,
+        location,
+        metrics: input.metrics,
+        forecastDays: days
+      }), input.signal);
+      marineByDate = marineForecastDays(marineJson, forecast.map((day) => day.date), input.metrics);
+    } catch {
+      marineByDate = unavailableMarineForecastDays(
+        forecast.map((day) => day.date),
+        requestedMarineMetrics
+      );
+    }
+  }
   return {
     provider: 'open-meteo',
     fetchedAt: new Date().toISOString(),
     location,
     units: input.config.units,
-    days: forecastDays(forecastJson)
+    days: forecast.map((day) => ({
+      ...day,
+      ...(marineByDate.get(day.date) ? { marine: marineByDate.get(day.date)! } : {})
+    }))
   };
 }
 
@@ -275,6 +299,15 @@ function marineVariables(metrics: WeatherMetricFlags): string[] {
   ];
 }
 
+function marineMetricKeys(metrics: WeatherMetricFlags): WeatherMarineMetricKey[] {
+  return [
+    ...(metrics.tide ? ['tide' as const] : []),
+    ...(metrics.wave ? ['wave' as const] : []),
+    ...(metrics.oceanCurrent ? ['oceanCurrent' as const] : []),
+    ...(metrics.seaSurfaceTemperature ? ['seaSurfaceTemperature' as const] : [])
+  ];
+}
+
 function fallbackVariables(values: string[], fallback: string[]): string[] {
   return values.length > 0 ? values : fallback;
 }
@@ -319,6 +352,43 @@ function marineUrl(input: {
   url.searchParams.set('longitude', String(input.location.longitude));
   url.searchParams.set('timezone', input.location.timezone);
   url.searchParams.set('current', input.current.join(','));
+  if (input.config.units.windSpeedUnit !== 'kmh') {
+    url.searchParams.set('wind_speed_unit', input.config.units.windSpeedUnit);
+  }
+  return url.toString();
+}
+
+function marineForecastUrl(input: {
+  config: WeatherConfig;
+  location: WeatherLocation;
+  metrics: WeatherMetricFlags;
+  forecastDays: number;
+}): string {
+  const url = new URL(input.config.providerSettings.openMeteo.marineBaseUrl);
+  url.searchParams.set('latitude', String(input.location.latitude));
+  url.searchParams.set('longitude', String(input.location.longitude));
+  url.searchParams.set('timezone', input.location.timezone);
+  url.searchParams.set('forecast_days', String(input.forecastDays));
+  url.searchParams.set('cell_selection', 'sea');
+  if (input.metrics.tide) {
+    url.searchParams.set('minutely_15', 'sea_level_height_msl');
+  }
+  if (input.metrics.wave) {
+    url.searchParams.set('daily', [
+      'wave_height_max',
+      'wave_direction_dominant',
+      'wave_period_max'
+    ].join(','));
+  }
+  const hourly = [
+    ...(input.metrics.oceanCurrent
+      ? ['ocean_current_velocity', 'ocean_current_direction']
+      : []),
+    ...(input.metrics.seaSurfaceTemperature ? ['sea_surface_temperature'] : [])
+  ];
+  if (hourly.length > 0) {
+    url.searchParams.set('hourly', hourly.join(','));
+  }
   if (input.config.units.windSpeedUnit !== 'kmh') {
     url.searchParams.set('wind_speed_unit', input.config.units.windSpeedUnit);
   }
@@ -386,6 +456,196 @@ function forecastDays(response: JsonRecord): WeatherForecastOutput['days'] {
     ...metricAt(daily, units, 'wind_gusts_10m_max', 'windGustsMax', index),
     ...metricAt(daily, units, 'wind_direction_10m_dominant', 'windDirectionDominant', index)
   }));
+}
+
+function marineForecastDays(
+  response: JsonRecord,
+  dates: string[],
+  metrics: WeatherMetricFlags
+): Map<string, NonNullable<WeatherForecastOutput['days'][number]['marine']>> {
+  const requested = marineMetricKeys(metrics);
+  const tideEventsByDate = tideEvents(response);
+  const daily = record(response.daily);
+  const dailyUnits = record(response.daily_units);
+  const dailyDates = stringArray(daily.time);
+  const hourly = record(response.hourly);
+  const hourlyUnits = record(response.hourly_units);
+  const hourlyTimes = stringArray(hourly.time);
+  const result = new Map<string, NonNullable<WeatherForecastOutput['days'][number]['marine']>>();
+
+  for (const date of dates) {
+    const unavailable: WeatherMarineMetricKey[] = [];
+    const tideForDate = tideEventsByDate.get(date) ?? [];
+    const dailyIndex = dailyDates.indexOf(date);
+    const currentSummary = hourlyMarineSummary(hourly, hourlyUnits, hourlyTimes, date);
+    const waveHeightMax = dailyIndex >= 0
+      ? metricValueAt(daily, dailyUnits, 'wave_height_max', dailyIndex)
+      : undefined;
+    const waveDirectionDominant = dailyIndex >= 0
+      ? metricValueAt(daily, dailyUnits, 'wave_direction_dominant', dailyIndex)
+      : undefined;
+    const wavePeriodMax = dailyIndex >= 0
+      ? metricValueAt(daily, dailyUnits, 'wave_period_max', dailyIndex)
+      : undefined;
+
+    if (metrics.tide && tideForDate.length === 0) {
+      unavailable.push('tide');
+    }
+    if (metrics.wave && !waveHeightMax && !waveDirectionDominant && !wavePeriodMax) {
+      unavailable.push('wave');
+    }
+    if (metrics.oceanCurrent && !currentSummary.oceanCurrentVelocityMax) {
+      unavailable.push('oceanCurrent');
+    }
+    if (
+      metrics.seaSurfaceTemperature &&
+      !currentSummary.seaSurfaceTemperatureMin &&
+      !currentSummary.seaSurfaceTemperatureMax
+    ) {
+      unavailable.push('seaSurfaceTemperature');
+    }
+
+    result.set(date, {
+      requested,
+      unavailable,
+      tideEvents: tideForDate,
+      ...(waveHeightMax ? { waveHeightMax } : {}),
+      ...(waveDirectionDominant ? { waveDirectionDominant } : {}),
+      ...(wavePeriodMax ? { wavePeriodMax } : {}),
+      ...currentSummary
+    });
+  }
+  return result;
+}
+
+function unavailableMarineForecastDays(
+  dates: string[],
+  requested: WeatherMarineMetricKey[]
+): Map<string, NonNullable<WeatherForecastOutput['days'][number]['marine']>> {
+  return new Map(dates.map((date) => [
+    date,
+    {
+      requested,
+      unavailable: [...requested],
+      tideEvents: []
+    }
+  ]));
+}
+
+function tideEvents(response: JsonRecord): Map<string, WeatherTideEvent[]> {
+  const values = record(response.minutely_15);
+  const units = record(response.minutely_15_units);
+  const times = stringArray(values.time);
+  const heights = Array.isArray(values.sea_level_height_msl)
+    ? values.sea_level_height_msl
+    : [];
+  const unit = stringValue(units.sea_level_height_msl, '');
+  const result = new Map<string, WeatherTideEvent[]>();
+
+  for (let index = 1; index < times.length - 1; index += 1) {
+    const previous = numberValue(heights[index - 1]);
+    const current = numberValue(heights[index]);
+    const next = numberValue(heights[index + 1]);
+    if (previous === undefined || current === undefined || next === undefined) {
+      continue;
+    }
+    const type = current > previous && current >= next
+      ? 'high'
+      : current < previous && current <= next
+        ? 'low'
+        : undefined;
+    if (!type) {
+      continue;
+    }
+    const time = times[index]!;
+    const date = time.slice(0, 10);
+    const events = result.get(date) ?? [];
+    events.push({
+      type,
+      time,
+      height: { value: current, unit }
+    });
+    result.set(date, events);
+  }
+
+  return result;
+}
+
+function hourlyMarineSummary(
+  hourly: JsonRecord,
+  units: JsonRecord,
+  times: string[],
+  date: string
+): Pick<
+  NonNullable<WeatherForecastOutput['days'][number]['marine']>,
+  | 'oceanCurrentTime'
+  | 'oceanCurrentVelocityMax'
+  | 'oceanCurrentDirectionAtMax'
+  | 'seaSurfaceTemperatureMin'
+  | 'seaSurfaceTemperatureMax'
+> {
+  const indices = times
+    .map((time, index) => ({ time, index }))
+    .filter((entry) => entry.time.slice(0, 10) === date);
+  let currentMax: { time: string; value: number; direction?: number | undefined } | undefined;
+  const temperatures: number[] = [];
+
+  for (const entry of indices) {
+    const velocity = numberArrayValue(hourly.ocean_current_velocity, entry.index);
+    if (velocity !== undefined && (!currentMax || velocity > currentMax.value)) {
+      currentMax = {
+        time: entry.time,
+        value: velocity,
+        direction: numberArrayValue(hourly.ocean_current_direction, entry.index)
+      };
+    }
+    const temperature = numberArrayValue(hourly.sea_surface_temperature, entry.index);
+    if (temperature !== undefined) {
+      temperatures.push(temperature);
+    }
+  }
+
+  const temperatureUnit = stringValue(units.sea_surface_temperature, '');
+  return {
+    ...(currentMax ? {
+      oceanCurrentTime: currentMax.time,
+      oceanCurrentVelocityMax: {
+        value: currentMax.value,
+        unit: stringValue(units.ocean_current_velocity, '')
+      },
+      ...(currentMax.direction !== undefined ? {
+        oceanCurrentDirectionAtMax: {
+          value: currentMax.direction,
+          unit: stringValue(units.ocean_current_direction, '')
+        }
+      } : {})
+    } : {}),
+    ...(temperatures.length > 0 ? {
+      seaSurfaceTemperatureMin: {
+        value: Math.min(...temperatures),
+        unit: temperatureUnit
+      },
+      seaSurfaceTemperatureMax: {
+        value: Math.max(...temperatures),
+        unit: temperatureUnit
+      }
+    } : {})
+  };
+}
+
+function metricValueAt(
+  values: JsonRecord,
+  units: JsonRecord,
+  sourceKey: string,
+  index: number
+): WeatherMetricValue | undefined {
+  const value = numberArrayValue(values[sourceKey], index);
+  return value === undefined
+    ? undefined
+    : {
+        value,
+        unit: stringValue(units[sourceKey], '')
+      };
 }
 
 function metric(
