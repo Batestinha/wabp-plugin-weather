@@ -224,13 +224,7 @@ function resolveLocation(
   config: WeatherConfig,
   override: WeatherCurrentInput['location']
 ): WeatherLocation {
-  return {
-    ...config.location,
-    ...(override?.label ? { label: override.label } : {}),
-    ...(override?.latitude !== undefined ? { latitude: override.latitude } : {}),
-    ...(override?.longitude !== undefined ? { longitude: override.longitude } : {}),
-    ...(override?.timezone ? { timezone: override.timezone } : {})
-  };
+  return override ?? config.location;
 }
 
 function mergeMetrics(config: WeatherConfig, overrides?: WeatherMetricOverrides | undefined): WeatherMetricFlags {

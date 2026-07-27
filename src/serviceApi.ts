@@ -11,10 +11,10 @@ export const WEATHER_FORECAST_METHOD = 'forecast';
 export const WEATHER_MARINE_METHOD = 'marine';
 
 export const weatherServiceLocationSchema = z.object({
-  label: z.string().trim().min(1).optional(),
-  latitude: z.number().min(-90).max(90).optional(),
-  longitude: z.number().min(-180).max(180).optional(),
-  timezone: z.string().trim().min(1).optional()
+  label: z.string().trim().min(1),
+  latitude: z.number().min(-90).max(90),
+  longitude: z.number().min(-180).max(180),
+  timezone: z.string().trim().min(1)
 }).strict();
 
 export const weatherServiceMetricOverridesSchema = z.object({
