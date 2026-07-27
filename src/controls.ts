@@ -32,7 +32,7 @@ function control(
     dangerous: false,
     sensitivity: { sensitive: false, redact: 'none' },
     auditAction: 'operator_console.plugin_config.update',
-    relatedCommandIds: ['/weather', '/weather current', '/weather forecast', '/weather marine'],
+    relatedCommandIds: [],
     relatedActionIds: []
   });
 }
@@ -51,8 +51,8 @@ const PRECIPITATION_UNIT_OPTIONS = [
 ];
 
 export const weatherControls: ControlDescriptor[] = [
-  control('enabled', 'Enabled', 'Enable weather commands and the plugin weather service for this scope.', 10, { type: 'boolean' }, { widget: 'toggle' }),
-  control('provider', 'Provider', 'Weather data provider used by commands and service calls.', 20, {
+  control('enabled', 'Enabled', 'Enable the plugin weather service for this scope.', 10, { type: 'boolean' }, { widget: 'toggle' }),
+  control('provider', 'Provider', 'Weather data provider used by service calls.', 20, {
     type: 'enum',
     enum: PROVIDER_OPTIONS
   }, { widget: 'segmented', options: PROVIDER_OPTIONS }),
@@ -62,7 +62,7 @@ export const weatherControls: ControlDescriptor[] = [
     min: 0,
     max: 3600
   }, { widget: 'number' }),
-  control('forecastDays', 'Forecast days', 'Default number of days returned by /weather forecast and service forecast calls.', 40, {
+  control('forecastDays', 'Forecast days', 'Default number of days returned by forecast service calls.', 40, {
     type: 'number',
     unit: 'days',
     min: 1,
