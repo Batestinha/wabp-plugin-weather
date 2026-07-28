@@ -9,6 +9,7 @@ export const WEATHER_SERVICE_ID = 'official.weather.v2';
 export const WEATHER_QUERY_METHOD = 'query';
 export const WEATHER_MAX_FORECAST_DAYS = 16;
 export const WEATHER_MAX_DAY_OFFSET = WEATHER_MAX_FORECAST_DAYS - 1;
+export const WEATHER_MARINE_MODES = ['auto'] as const;
 
 export const weatherServiceLocationSchema = z.object({
   label: z.string().trim().min(1).max(2048),
@@ -52,7 +53,7 @@ export const weatherQueryInputSchema = z.object({
   location: weatherQueryLocationSchema,
   selection: weatherDaySelectionSchema.optional(),
   language: z.string().trim().min(2).max(35).optional(),
-  includeMarine: z.boolean().default(false),
+  includeMarine: z.union([z.boolean(), z.enum(WEATHER_MARINE_MODES)]).default(false),
   metrics: weatherServiceMetricOverridesSchema.optional()
 }).strict();
 
@@ -153,6 +154,7 @@ export const weatherQueryOutputSchema = z.discriminatedUnion('kind', [
 export type WeatherServiceLocation = z.infer<typeof weatherServiceLocationSchema>;
 export type WeatherDaySelection = z.infer<typeof weatherDaySelectionSchema>;
 export type WeatherQueryInput = z.infer<typeof weatherQueryInputSchema>;
+export type WeatherMarineMode = WeatherQueryInput['includeMarine'];
 export type WeatherMetricValue = z.infer<typeof weatherMetricValueSchema>;
 export type WeatherMarineMetricKey = z.infer<typeof weatherMarineMetricKeySchema>;
 export type WeatherTideEvent = z.infer<typeof weatherTideEventSchema>;

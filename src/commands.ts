@@ -4,12 +4,14 @@ import { tokenizeArgs } from '../../../adminBot/router/commandParser';
 import type { PluginCommandContext } from '../../../platform/pluginRuntime/types';
 import { requireScopeId } from '../shared';
 import { WEATHER_PLUGIN_ID } from './manifest';
+import { renderMarineForecast } from './marineForecast';
 import { renderWeatherQuery } from './presentation';
 import {
   WEATHER_MAX_DAY_OFFSET,
   WEATHER_QUERY_METHOD,
   WEATHER_SERVICE_ID,
   type WeatherDaySelection,
+  type WeatherQueryInput,
   type WeatherQueryOutput
 } from './serviceApi';
 
@@ -19,6 +21,15 @@ type WeatherRequestParseResult =
 
 const DAY_SELECTOR_CANDIDATE_PATTERN = /^[\d-]+$/;
 const DAY_SELECTOR_PATTERN = /^(\d+)(?:-(\d+))?$/;
+const CURRENT_MARINE_SELECTION: WeatherDaySelection = { startDay: 0, endDay: 0 };
+const MARINE_ONLY_METRIC_OVERRIDES = {
+  temperature: false,
+  apparentTemperature: false,
+  relativeHumidity: false,
+  wind: false,
+  precipitation: false,
+  weatherCode: false
+} satisfies NonNullable<WeatherQueryInput['metrics']>;
 
 export function registerWeatherCommands(context: PluginCommandContext): void {
   context.router.register('weather', '*', weatherCommand(), async (ctx) => {
@@ -37,28 +48,65 @@ export function registerWeatherCommands(context: PluginCommandContext): void {
       return failed(ctx);
     }
     try {
-      const output = await context.services.call<WeatherQueryOutput>({
-        serviceId: WEATHER_SERVICE_ID,
-        method: WEATHER_QUERY_METHOD,
-        scopeId: requireScopeId(ctx),
-        actorWid: ctx.actor?.wid ?? ctx.message.senderWid,
-        ...(ctx.groupId ? { groupId: ctx.groupId } : {}),
-        ...(ctx.groupWid ? { groupWid: ctx.groupWid } : {}),
-        input: {
-          location: parsed.location,
-          ...(parsed.selection ? { selection: parsed.selection } : {}),
-          language: ctx.locale,
-          includeMarine: false
-        }
+      const output = await callWeatherQuery(context, ctx, {
+        location: parsed.location,
+        ...(parsed.selection ? { selection: parsed.selection, includeMarine: 'auto' as const } : { includeMarine: false }),
+        language: ctx.locale
       });
+      const marineText = output.kind === 'forecast'
+        ? renderMarineForecast(output.report, ctx.t, ctx.locale)
+        : await currentMarineForecastText(context, ctx, parsed.location);
       return {
         handled: true,
-        text: renderWeatherQuery(output, ctx.t, ctx.locale)
+        text: [
+          renderWeatherQuery(output, ctx.t, ctx.locale),
+          marineText
+        ].filter((line): line is string => Boolean(line?.trim())).join('\n\n')
       };
     } catch {
       return failed(ctx);
     }
   });
+}
+
+async function callWeatherQuery(
+  context: PluginCommandContext,
+  ctx: CommandContext,
+  input: WeatherQueryInput
+): Promise<WeatherQueryOutput> {
+  if (!context.services) {
+    throw new Error('Weather services are unavailable.');
+  }
+  return context.services.call<WeatherQueryOutput>({
+    serviceId: WEATHER_SERVICE_ID,
+    method: WEATHER_QUERY_METHOD,
+    scopeId: requireScopeId(ctx),
+    actorWid: ctx.actor?.wid ?? ctx.message.senderWid,
+    ...(ctx.groupId ? { groupId: ctx.groupId } : {}),
+    ...(ctx.groupWid ? { groupWid: ctx.groupWid } : {}),
+    input
+  });
+}
+
+async function currentMarineForecastText(
+  context: PluginCommandContext,
+  ctx: CommandContext,
+  location: string
+): Promise<string | undefined> {
+  try {
+    const output = await callWeatherQuery(context, ctx, {
+      location,
+      selection: CURRENT_MARINE_SELECTION,
+      language: ctx.locale,
+      includeMarine: 'auto',
+      metrics: MARINE_ONLY_METRIC_OVERRIDES
+    });
+    return output.kind === 'forecast'
+      ? renderMarineForecast(output.report, ctx.t, ctx.locale)
+      : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 export function parseWeatherRequest(rawArgs: string): WeatherRequestParseResult {

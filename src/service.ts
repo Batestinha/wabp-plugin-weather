@@ -17,6 +17,7 @@ import {
   type WeatherCurrentOutput,
   type WeatherDaySelection,
   type WeatherForecastOutput,
+  type WeatherMarineMode,
   type WeatherMarineMetricKey,
   type WeatherMetricValue,
   type WeatherQueryInput,
@@ -31,6 +32,9 @@ type JsonRecord = Record<string, unknown>;
 type WeatherMetricOverrides = {
   [Key in keyof WeatherMetricFlags]?: WeatherMetricFlags[Key] | undefined;
 };
+
+const AUTO_MARINE_MAX_SEA_CELL_DISTANCE_KM = 35;
+const EARTH_RADIUS_KM = 6371.0088;
 
 export function registerWeatherServices(context: PluginServiceRegistrationContext): PluginServiceRegistration[] {
   return [{
@@ -69,6 +73,7 @@ export function registerWeatherServices(context: PluginServiceRegistrationContex
               location,
               metrics,
               selection: input.selection,
+              marineMode: input.includeMarine,
               signal: call.signal
             })
           };
@@ -116,6 +121,7 @@ async function fetchWeatherForecast(input: {
   location: WeatherServiceLocation;
   metrics: WeatherMetricFlags;
   selection: WeatherDaySelection;
+  marineMode: WeatherMarineMode;
   signal?: AbortSignal | undefined;
 }): Promise<WeatherForecastOutput> {
   const days = input.selection.endDay + 1;
@@ -136,12 +142,16 @@ async function fetchWeatherForecast(input: {
         metrics: input.metrics,
         forecastDays: days
       }), input.signal);
-      marineByDate = marineForecastDays(marineJson, forecast.map((day) => day.date), input.metrics);
+      if (input.marineMode === true || marineResponseIsCoastal(marineJson, input.location)) {
+        marineByDate = marineForecastDays(marineJson, forecast.map((day) => day.date), input.metrics);
+      }
     } catch {
-      marineByDate = unavailableMarineForecastDays(
-        forecast.map((day) => day.date),
-        requestedMarineMetrics
-      );
+      if (input.marineMode === true) {
+        marineByDate = unavailableMarineForecastDays(
+          forecast.map((day) => day.date),
+          requestedMarineMetrics
+        );
+      }
     }
   }
   return {
@@ -221,7 +231,7 @@ async function resolveQueryLocation(
 
 function queryMetrics(config: WeatherConfig, input: WeatherQueryInput): WeatherMetricFlags {
   const metrics = mergeMetrics(config, input.metrics);
-  if (!input.includeMarine) {
+  if (input.includeMarine === false) {
     metrics.tide = false;
     metrics.wave = false;
     metrics.oceanCurrent = false;
@@ -341,6 +351,40 @@ function marineForecastUrl(input: {
     url.searchParams.set('wind_speed_unit', input.config.units.windSpeedUnit);
   }
   return url.toString();
+}
+
+function marineResponseIsCoastal(response: JsonRecord, location: WeatherServiceLocation): boolean {
+  const seaLatitude = numberValue(response.latitude);
+  const seaLongitude = numberValue(response.longitude);
+  if (seaLatitude === undefined || seaLongitude === undefined) {
+    return false;
+  }
+  return haversineDistanceKm(
+    location.latitude,
+    location.longitude,
+    seaLatitude,
+    seaLongitude
+  ) <= AUTO_MARINE_MAX_SEA_CELL_DISTANCE_KM;
+}
+
+function haversineDistanceKm(
+  startLatitude: number,
+  startLongitude: number,
+  endLatitude: number,
+  endLongitude: number
+): number {
+  const startLatRad = degreesToRadians(startLatitude);
+  const endLatRad = degreesToRadians(endLatitude);
+  const deltaLatRad = degreesToRadians(endLatitude - startLatitude);
+  const deltaLonRad = degreesToRadians(endLongitude - startLongitude);
+  const sinDeltaLat = Math.sin(deltaLatRad / 2);
+  const sinDeltaLon = Math.sin(deltaLonRad / 2);
+  const a = sinDeltaLat ** 2 + Math.cos(startLatRad) * Math.cos(endLatRad) * sinDeltaLon ** 2;
+  return EARTH_RADIUS_KM * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+function degreesToRadians(value: number): number {
+  return value * Math.PI / 180;
 }
 
 async function fetchJson(url: string, signal?: AbortSignal | undefined): Promise<JsonRecord> {
