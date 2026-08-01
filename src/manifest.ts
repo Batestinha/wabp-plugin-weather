@@ -17,6 +17,24 @@ export const weatherManifest: PluginManifest = {
   descriptionKey: 'official.weather.description',
   defaultMessages: weatherMessages,
   commands: ['/weather'],
+  help: {
+    featureId: 'weather',
+    titleKey: 'official.weather.help.feature.title',
+    summaryKey: 'official.weather.help.feature.summary',
+    order: 30,
+    aliases: ['forecast', 'temperature', 'rain', 'marine'],
+    topics: [{
+      topicId: 'weather-forecast',
+      titleKey: 'official.weather.help.forecast.title',
+      summaryKey: 'official.weather.help.forecast.summary',
+      order: 10,
+      commands: ['/weather'],
+      instructionKeys: ['official.weather.help.forecast.instruction'],
+      exampleKeys: ['official.weather.help.forecast.example.current', 'official.weather.help.forecast.example.range'],
+      keywords: ['current', 'forecast', 'location', 'day', 'range', 'marine'],
+      availability: { invocation: 'group_only', requiredAccessPlane: 'group_member' }
+    }]
+  },
   eventSubscriptions: [],
   services: [{
     serviceId: WEATHER_SERVICE_ID,

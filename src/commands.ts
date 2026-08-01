@@ -201,8 +201,14 @@ function weatherCommand(): CommandMetadata {
     mutation: 'none',
     help: {
       familyKey: 'official.weather.help.family',
+      featureId: 'weather',
+      topicId: 'weather-forecast',
+      titleKey: 'official.weather.help.forecast.title',
       descriptionKey: 'official.weather.help.command',
-      usage: '/weather {location} [day|range]'
+      usage: '/weather {location} [day|range]',
+      exampleKeys: ['official.weather.help.forecast.example.current', 'official.weather.help.forecast.example.range'],
+      aliases: ['forecast'],
+      keywords: ['weather', 'forecast', 'location', 'temperature', 'rain']
     },
     assistant: {
       summary: 'Query current weather or forecasts. Forecast days are numeric offsets: 0 is today, 1 is tomorrow, and 0-5 is an inclusive range.',
