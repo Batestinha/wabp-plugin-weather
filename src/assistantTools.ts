@@ -10,6 +10,7 @@ import {
 import { executeWeatherRequest } from './commands';
 import { WEATHER_MAX_DAY_OFFSET } from './serviceApi';
 import { WEATHER_PLUGIN_ID } from './manifest';
+import { requireStableIdentityAddress } from '../../../platform/identity/messageActor';
 
 const weatherAssistantInputSchema = z.object({
   location: z.string().trim().min(2).max(256),
@@ -106,9 +107,11 @@ function weatherToolRequestContext(
   locale: string,
   t: ReturnType<PluginCommandContext['i18n']['translator']>
 ) {
+  const actorAddress = requireStableIdentityAddress(context.actor);
   return {
     scopeId: context.scopeId,
-    actorWid: context.actor.wid,
+    actorWid: actorAddress.canonicalWid,
+    actorIdentityId: actorAddress.identityId,
     locale,
     t,
     ...(context.groupId ? { groupId: context.groupId } : {}),

@@ -3,6 +3,7 @@ import type { CommandContext } from '../../../adminBot/router/commandRouter';
 import { tokenizeArgs } from '../../../adminBot/router/commandParser';
 import type { TranslateFn } from '../../../platform/i18n';
 import type { PluginCommandContext } from '../../../platform/pluginRuntime/types';
+import { requireStableIdentityAddress } from '../../../platform/identity/messageActor';
 import { requireScopeId } from '../shared';
 import { WEATHER_PLUGIN_ID } from './manifest';
 import { renderMarineForecast } from './marineForecast';
@@ -27,6 +28,7 @@ export interface WeatherRequest {
 
 export interface WeatherRequestContext {
   scopeId: string;
+  actorIdentityId: string;
   actorWid: string;
   locale: string;
   t: TranslateFn;
@@ -106,7 +108,7 @@ async function callWeatherQuery(
     serviceId: WEATHER_SERVICE_ID,
     method: WEATHER_QUERY_METHOD,
     scopeId: target.scopeId,
-    actorWid: target.actorWid,
+    actorIdentityId: target.actorIdentityId,
     ...(target.groupId ? { groupId: target.groupId } : {}),
     ...(target.groupWid ? { groupWid: target.groupWid } : {}),
     ...(target.managementMode ? { managementMode: target.managementMode } : {}),
@@ -137,9 +139,14 @@ async function currentMarineForecastText(
 }
 
 function weatherRequestContext(ctx: CommandContext): WeatherRequestContext {
+  if (!ctx.actor) {
+    throw new Error('Weather requests require an authoritative message actor.');
+  }
+  const actor = requireStableIdentityAddress(ctx.actor);
   return {
     scopeId: requireScopeId(ctx),
-    actorWid: ctx.actor?.wid ?? ctx.message.senderWid,
+    actorIdentityId: actor.identityId,
+    actorWid: actor.canonicalWid,
     locale: ctx.locale,
     t: ctx.t,
     ...(ctx.groupId ? { groupId: ctx.groupId } : {}),

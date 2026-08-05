@@ -46,7 +46,7 @@ export function registerWeatherServices(context: PluginServiceRegistrationContex
       outputSchema: weatherQueryOutputSchema,
       async handler(rawInput, call) {
         const input = rawInput as WeatherQueryInput;
-        const config = parseWeatherConfig(await context.configFor(call.scopeId, call.actorWid));
+        const config = parseWeatherConfig(await context.configFor(call.scopeId, call.actorIdentityId));
         assertWeatherEnabled(config);
         const location = await resolveQueryLocation(context, input, call);
         const metrics = queryMetrics(config, input);
@@ -207,7 +207,7 @@ async function resolveQueryLocation(
     serviceId: GEOCODER_SERVICE_ID,
     method: GEOCODER_GEOCODE_METHOD,
     scopeId: call.scopeId,
-    ...(call.actorWid ? { actorWid: call.actorWid } : {}),
+    ...(call.actorIdentityId ? { actorIdentityId: call.actorIdentityId } : {}),
     ...(call.groupId ? { groupId: call.groupId } : {}),
     ...(call.groupWid ? { groupWid: call.groupWid } : {}),
     input: {
