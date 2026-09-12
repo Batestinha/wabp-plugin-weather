@@ -1,4 +1,4 @@
-import type { PluginManifest } from '../../../../packages/plugin-sdk/src/manifest';
+import type { PluginManifest } from '@wabs/plugin-sdk/manifest';
 import { weatherConfigSchema } from './config';
 import { weatherMessages } from './messages';
 import {

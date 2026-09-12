@@ -1,4 +1,4 @@
-import type { MessageCatalog } from '../../../../packages/plugin-sdk/src/i18n';
+import type { MessageCatalog } from '@wabs/plugin-sdk/i18n';
 
 export const weatherMessages: MessageCatalog = {
   'official.weather.description': 'Location-based current weather and forecasts.',

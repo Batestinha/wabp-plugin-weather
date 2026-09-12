@@ -1,0 +1,548 @@
+{
+  "schemaVersion": 1,
+  "pluginId": "official.weather",
+  "name": "Weather",
+  "description": "Location-based current weather and forecasts.",
+  "kind": "managed_group",
+  "version": "0.4.2",
+  "coreApiRange": "^0.3.0",
+  "entrypoint": "dist/index.js",
+  "messageNamespace": "official.weather",
+  "descriptionKey": "official.weather.description",
+  "commands": [
+    "/weather"
+  ],
+  "help": {
+    "featureId": "weather",
+    "titleKey": "official.weather.help.feature.title",
+    "summaryKey": "official.weather.help.feature.summary",
+    "order": 30,
+    "aliases": [
+      "forecast",
+      "temperature",
+      "rain",
+      "marine"
+    ],
+    "topics": [
+      {
+        "topicId": "weather-forecast",
+        "titleKey": "official.weather.help.forecast.title",
+        "summaryKey": "official.weather.help.forecast.summary",
+        "order": 10,
+        "commands": [
+          "/weather"
+        ],
+        "instructionKeys": [
+          "official.weather.help.forecast.instruction"
+        ],
+        "exampleKeys": [
+          "official.weather.help.forecast.example.current",
+          "official.weather.help.forecast.example.range"
+        ],
+        "keywords": [
+          "current",
+          "forecast",
+          "location",
+          "day",
+          "range",
+          "marine"
+        ],
+        "availability": {
+          "invocation": "group_only",
+          "requiredAccessPlane": "group_member"
+        }
+      }
+    ]
+  },
+  "eventSubscriptions": [],
+  "services": [
+    {
+      "serviceId": "official.weather.v2",
+      "methods": [
+        {
+          "name": "query",
+          "access": "read"
+        }
+      ]
+    }
+  ],
+  "requiredPermissions": [],
+  "requiredBotCapabilities": [],
+  "dangerousActions": [],
+  "backgroundJobs": [],
+  "cancellation": {
+    "workflows": []
+  },
+  "dependencies": [
+    {
+      "pluginId": "official.geocoder",
+      "versionRange": ">=0.1.0",
+      "optional": false
+    }
+  ],
+  "assistant": {
+    "summary": "Location-based current weather and forecasts through one command, one unified query service, and one typed assistant tool.",
+    "useCases": [
+      "Show current weather for a named location.",
+      "Show one forecast day or an inclusive forecast range up to 15 days ahead.",
+      "Expose the same normalized weather query used by /weather to other plugins and the natural-language assistant."
+    ],
+    "prerequisites": [
+      "The plugin must be enabled for the target scope.",
+      "official.geocoder must be installed and enabled for named-location lookups."
+    ],
+    "workflows": [
+      {
+        "intent": "weather_query",
+        "description": "Show current weather or a selected forecast day range for a named location.",
+        "commands": [
+          "/weather"
+        ]
+      }
+    ]
+  },
+  "operatorConsole": {
+    "configPaths": [
+      "enabled",
+      "provider",
+      "cacheTtlSeconds",
+      "units.temperatureUnit",
+      "units.windSpeedUnit",
+      "units.precipitationUnit",
+      "metrics.temperature",
+      "metrics.apparentTemperature",
+      "metrics.relativeHumidity",
+      "metrics.wind",
+      "metrics.precipitation",
+      "metrics.weatherCode",
+      "metrics.tide",
+      "metrics.wave",
+      "metrics.oceanCurrent",
+      "metrics.seaSurfaceTemperature",
+      "providerSettings.openMeteo.forecastBaseUrl",
+      "providerSettings.openMeteo.marineBaseUrl"
+    ],
+    "controls": [
+      {
+        "id": "plugin.official.weather.enabled",
+        "path": "enabled",
+        "label": "Enabled",
+        "description": "Enable /weather and the unified weather query service for this scope.",
+        "section": "Weather",
+        "order": 10,
+        "schema": {
+          "type": "boolean"
+        },
+        "ui": {
+          "helpText": "Enable /weather and the unified weather query service for this scope.",
+          "widget": "toggle"
+        },
+        "relatedCommandIds": [
+          "/weather"
+        ]
+      },
+      {
+        "id": "plugin.official.weather.provider",
+        "path": "provider",
+        "label": "Provider",
+        "description": "Weather data provider used by /weather and query service calls.",
+        "section": "Weather",
+        "order": 20,
+        "schema": {
+          "type": "enum",
+          "enum": [
+            {
+              "value": "open-meteo",
+              "label": "Open-Meteo"
+            }
+          ]
+        },
+        "ui": {
+          "helpText": "Weather data provider used by /weather and query service calls.",
+          "widget": "segmented",
+          "options": [
+            {
+              "value": "open-meteo",
+              "label": "Open-Meteo"
+            }
+          ]
+        },
+        "relatedCommandIds": [
+          "/weather"
+        ]
+      },
+      {
+        "id": "plugin.official.weather.cacheTtlSeconds",
+        "path": "cacheTtlSeconds",
+        "label": "Cache TTL",
+        "description": "Seconds to cache provider responses in the plugin ephemeral store. Use 0 to disable caching.",
+        "section": "Weather",
+        "order": 30,
+        "schema": {
+          "type": "number",
+          "unit": "seconds",
+          "min": 0,
+          "max": 3600
+        },
+        "ui": {
+          "helpText": "Seconds to cache provider responses in the plugin ephemeral store. Use 0 to disable caching.",
+          "widget": "number"
+        },
+        "relatedCommandIds": [
+          "/weather"
+        ]
+      },
+      {
+        "id": "plugin.official.weather.units.temperatureUnit",
+        "path": "units.temperatureUnit",
+        "label": "Temperature unit",
+        "description": "Temperature unit for current and forecast weather.",
+        "section": "Weather units",
+        "order": 200,
+        "schema": {
+          "type": "enum",
+          "enum": [
+            {
+              "value": "celsius",
+              "label": "celsius"
+            },
+            {
+              "value": "fahrenheit",
+              "label": "fahrenheit"
+            }
+          ]
+        },
+        "ui": {
+          "helpText": "Temperature unit for current and forecast weather.",
+          "widget": "segmented",
+          "options": [
+            {
+              "value": "celsius",
+              "label": "celsius"
+            },
+            {
+              "value": "fahrenheit",
+              "label": "fahrenheit"
+            }
+          ]
+        },
+        "relatedCommandIds": [
+          "/weather"
+        ]
+      },
+      {
+        "id": "plugin.official.weather.units.windSpeedUnit",
+        "path": "units.windSpeedUnit",
+        "label": "Wind speed unit",
+        "description": "Wind and ocean-current speed unit for weather reports.",
+        "section": "Weather units",
+        "order": 210,
+        "schema": {
+          "type": "enum",
+          "enum": [
+            {
+              "value": "kmh",
+              "label": "km/h"
+            },
+            {
+              "value": "mph",
+              "label": "mph"
+            },
+            {
+              "value": "ms",
+              "label": "m/s"
+            },
+            {
+              "value": "kn",
+              "label": "knots"
+            }
+          ]
+        },
+        "ui": {
+          "helpText": "Wind and ocean-current speed unit for weather reports.",
+          "widget": "segmented",
+          "options": [
+            {
+              "value": "kmh",
+              "label": "km/h"
+            },
+            {
+              "value": "mph",
+              "label": "mph"
+            },
+            {
+              "value": "ms",
+              "label": "m/s"
+            },
+            {
+              "value": "kn",
+              "label": "knots"
+            }
+          ]
+        },
+        "relatedCommandIds": [
+          "/weather"
+        ]
+      },
+      {
+        "id": "plugin.official.weather.units.precipitationUnit",
+        "path": "units.precipitationUnit",
+        "label": "Precipitation unit",
+        "description": "Precipitation unit for current and forecast weather.",
+        "section": "Weather units",
+        "order": 220,
+        "schema": {
+          "type": "enum",
+          "enum": [
+            {
+              "value": "mm",
+              "label": "mm"
+            },
+            {
+              "value": "inch",
+              "label": "inch"
+            }
+          ]
+        },
+        "ui": {
+          "helpText": "Precipitation unit for current and forecast weather.",
+          "widget": "segmented",
+          "options": [
+            {
+              "value": "mm",
+              "label": "mm"
+            },
+            {
+              "value": "inch",
+              "label": "inch"
+            }
+          ]
+        },
+        "relatedCommandIds": [
+          "/weather"
+        ]
+      },
+      {
+        "id": "plugin.official.weather.metrics.temperature",
+        "path": "metrics.temperature",
+        "label": "Temperature",
+        "description": "Include air temperature in current weather and daily forecasts.",
+        "section": "Weather metrics",
+        "order": 300,
+        "schema": {
+          "type": "boolean"
+        },
+        "ui": {
+          "helpText": "Include air temperature in current weather and daily forecasts.",
+          "widget": "toggle"
+        },
+        "relatedCommandIds": [
+          "/weather"
+        ]
+      },
+      {
+        "id": "plugin.official.weather.metrics.apparentTemperature",
+        "path": "metrics.apparentTemperature",
+        "label": "Feels like",
+        "description": "Include apparent temperature in current weather.",
+        "section": "Weather metrics",
+        "order": 310,
+        "schema": {
+          "type": "boolean"
+        },
+        "ui": {
+          "helpText": "Include apparent temperature in current weather.",
+          "widget": "toggle"
+        },
+        "relatedCommandIds": [
+          "/weather"
+        ]
+      },
+      {
+        "id": "plugin.official.weather.metrics.relativeHumidity",
+        "path": "metrics.relativeHumidity",
+        "label": "Relative humidity",
+        "description": "Include relative humidity in current weather.",
+        "section": "Weather metrics",
+        "order": 320,
+        "schema": {
+          "type": "boolean"
+        },
+        "ui": {
+          "helpText": "Include relative humidity in current weather.",
+          "widget": "toggle"
+        },
+        "relatedCommandIds": [
+          "/weather"
+        ]
+      },
+      {
+        "id": "plugin.official.weather.metrics.wind",
+        "path": "metrics.wind",
+        "label": "Wind",
+        "description": "Include wind speed, direction, and gust metrics.",
+        "section": "Weather metrics",
+        "order": 330,
+        "schema": {
+          "type": "boolean"
+        },
+        "ui": {
+          "helpText": "Include wind speed, direction, and gust metrics.",
+          "widget": "toggle"
+        },
+        "relatedCommandIds": [
+          "/weather"
+        ]
+      },
+      {
+        "id": "plugin.official.weather.metrics.precipitation",
+        "path": "metrics.precipitation",
+        "label": "Precipitation",
+        "description": "Include current precipitation and daily precipitation forecast metrics.",
+        "section": "Weather metrics",
+        "order": 340,
+        "schema": {
+          "type": "boolean"
+        },
+        "ui": {
+          "helpText": "Include current precipitation and daily precipitation forecast metrics.",
+          "widget": "toggle"
+        },
+        "relatedCommandIds": [
+          "/weather"
+        ]
+      },
+      {
+        "id": "plugin.official.weather.metrics.weatherCode",
+        "path": "metrics.weatherCode",
+        "label": "Weather code",
+        "description": "Include provider weather condition codes.",
+        "section": "Weather metrics",
+        "order": 350,
+        "schema": {
+          "type": "boolean"
+        },
+        "ui": {
+          "helpText": "Include provider weather condition codes.",
+          "widget": "toggle"
+        },
+        "relatedCommandIds": [
+          "/weather"
+        ]
+      },
+      {
+        "id": "plugin.official.weather.metrics.tide",
+        "path": "metrics.tide",
+        "label": "Tide / sea level",
+        "description": "Include forecast high/low tide times for query service consumers that request marine data.",
+        "section": "Marine metrics",
+        "order": 360,
+        "schema": {
+          "type": "boolean"
+        },
+        "ui": {
+          "helpText": "Include forecast high/low tide times for query service consumers that request marine data.",
+          "widget": "toggle"
+        },
+        "relatedCommandIds": [
+          "/weather"
+        ]
+      },
+      {
+        "id": "plugin.official.weather.metrics.wave",
+        "path": "metrics.wave",
+        "label": "Wave",
+        "description": "Include wave height, direction, and period from the marine provider.",
+        "section": "Marine metrics",
+        "order": 370,
+        "schema": {
+          "type": "boolean"
+        },
+        "ui": {
+          "helpText": "Include wave height, direction, and period from the marine provider.",
+          "widget": "toggle"
+        },
+        "relatedCommandIds": [
+          "/weather"
+        ]
+      },
+      {
+        "id": "plugin.official.weather.metrics.oceanCurrent",
+        "path": "metrics.oceanCurrent",
+        "label": "Ocean current",
+        "description": "Include ocean current speed and direction from the marine provider.",
+        "section": "Marine metrics",
+        "order": 380,
+        "schema": {
+          "type": "boolean"
+        },
+        "ui": {
+          "helpText": "Include ocean current speed and direction from the marine provider.",
+          "widget": "toggle"
+        },
+        "relatedCommandIds": [
+          "/weather"
+        ]
+      },
+      {
+        "id": "plugin.official.weather.metrics.seaSurfaceTemperature",
+        "path": "metrics.seaSurfaceTemperature",
+        "label": "Sea temperature",
+        "description": "Include sea surface temperature from the marine provider.",
+        "section": "Marine metrics",
+        "order": 390,
+        "schema": {
+          "type": "boolean"
+        },
+        "ui": {
+          "helpText": "Include sea surface temperature from the marine provider.",
+          "widget": "toggle"
+        },
+        "relatedCommandIds": [
+          "/weather"
+        ]
+      },
+      {
+        "id": "plugin.official.weather.providerSettings.openMeteo.forecastBaseUrl",
+        "path": "providerSettings.openMeteo.forecastBaseUrl",
+        "label": "Forecast endpoint",
+        "description": "Open-Meteo forecast API base URL.",
+        "section": "Weather provider",
+        "order": 500,
+        "schema": {
+          "type": "string",
+          "format": "url",
+          "required": true
+        },
+        "ui": {
+          "helpText": "Open-Meteo forecast API base URL.",
+          "widget": "url"
+        },
+        "relatedCommandIds": [
+          "/weather"
+        ]
+      },
+      {
+        "id": "plugin.official.weather.providerSettings.openMeteo.marineBaseUrl",
+        "path": "providerSettings.openMeteo.marineBaseUrl",
+        "label": "Marine endpoint",
+        "description": "Open-Meteo marine API base URL.",
+        "section": "Weather provider",
+        "order": 510,
+        "schema": {
+          "type": "string",
+          "format": "url",
+          "required": true
+        },
+        "ui": {
+          "helpText": "Open-Meteo marine API base URL.",
+          "widget": "url"
+        },
+        "relatedCommandIds": [
+          "/weather"
+        ]
+      }
+    ],
+    "internalConfigPaths": []
+  }
+}

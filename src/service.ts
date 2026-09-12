@@ -1,10 +1,10 @@
 import { createHash } from 'node:crypto';
-import type { PluginEphemeralStore } from '../../../../packages/plugin-sdk/src/ephemeral-store';
+import type { PluginEphemeralStore } from '@wabs/plugin-sdk/ephemeral-store';
 import type {
   PluginServiceCallContext,
   PluginServiceRegistration
-} from '../../../../packages/plugin-sdk/src/services';
-import type { ServicePluginContext as PluginServiceRegistrationContext } from '../../../../packages/plugin-sdk/src/service-plugin';
+} from '@wabs/plugin-sdk/services';
+import type { ServicePluginContext as PluginServiceRegistrationContext } from '@wabs/plugin-sdk/service-plugin';
 import {
   GEOCODER_GEOCODE_METHOD,
   GEOCODER_SERVICE_ID,

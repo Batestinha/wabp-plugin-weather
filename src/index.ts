@@ -1,4 +1,4 @@
-import type { CommandPlugin } from '../../../../packages/plugin-sdk/src/command-plugin';
+import type { CommandPlugin } from '@wabs/plugin-sdk/command-plugin';
 import { registerWeatherAssistantTools } from './assistantTools';
 import { registerWeatherCommands } from './commands';
 import { weatherManifest } from './manifest';

@@ -1,10 +1,10 @@
-import type { CommandMetadata } from '../../../../packages/plugin-sdk/src/command-metadata';
-import type { CommandContext } from '../../../../packages/plugin-sdk/src/commands';
-import { tokenizeArgs } from '../../../../packages/plugin-sdk/src/command-parser';
-import type { TranslateFn } from '../../../../packages/plugin-sdk/src/i18n';
-import type { PluginCommandContext } from '../../../../packages/plugin-sdk/src/command-plugin';
-import { requireStableIdentityAddress } from '../../../../packages/plugin-sdk/src/message-actor';
-import { requireScopeId } from '../../../../packages/plugin-sdk/src/commands';
+import type { CommandMetadata } from '@wabs/plugin-sdk/command-metadata';
+import type { CommandContext } from '@wabs/plugin-sdk/commands';
+import { tokenizeArgs } from '@wabs/plugin-sdk/command-parser';
+import type { TranslateFn } from '@wabs/plugin-sdk/i18n';
+import type { PluginCommandContext } from '@wabs/plugin-sdk/command-plugin';
+import { requireStableIdentityAddress } from '@wabs/plugin-sdk/message-actor';
+import { requireScopeId } from '@wabs/plugin-sdk/commands';
 import { WEATHER_PLUGIN_ID } from './manifest';
 import { renderMarineForecast } from './marineForecast';
 import { renderWeatherQuery } from './presentation';

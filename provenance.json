@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "sourceRepository": "https://github.com/Batestinha/wabp",
+  "sourceCommit": "fb01b730a259fc671b7f0cb6b66241f73a3098b9",
+  "sourceDirectory": "src/plugins/official/weather",
+  "sourceTreeSha": "1ee5e26138f53fea8c0312cb3a53180902effce0",
+  "extractedHistoryCommit": "319c094458b079d770a6ae63c256cea53111e422",
+  "sdk": {
+    "version": "0.3.2",
+    "path": "vendor/wabs-plugin-sdk-0.3.2-6e73ae5d45ff.tgz",
+    "sha256": "6e73ae5d45ffb7b73c9854d9182ab4b5c98ab4413064aa63624f41b3ac78281c",
+    "sourceDirectory": "packages/plugin-sdk",
+    "sourceCommit": "fb01b730a259fc671b7f0cb6b66241f73a3098b9"
+  },
+  "vendoredContracts": "contracts/provenance.json"
+}

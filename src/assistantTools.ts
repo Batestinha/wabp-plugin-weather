@@ -1,15 +1,15 @@
 import { z } from 'zod';
-import type { PluginCommandContext } from '../../../../packages/plugin-sdk/src/command-plugin';
+import type { PluginCommandContext } from '@wabs/plugin-sdk/command-plugin';
 import {
   jsonSchemaForZodObject,
   throwIfAborted,
   type AssistantTool,
   type AssistantToolContext
-} from '../../../../packages/plugin-sdk/src/assistant-tools';
+} from '@wabs/plugin-sdk/assistant-tools';
 import { executeWeatherRequest } from './commands';
 import { WEATHER_MAX_DAY_OFFSET } from './serviceApi';
 import { WEATHER_PLUGIN_ID } from './manifest';
-import { requireStableIdentityAddress } from '../../../../packages/plugin-sdk/src/message-actor';
+import { requireStableIdentityAddress } from '@wabs/plugin-sdk/message-actor';
 
 const weatherAssistantInputSchema = z.object({
   location: z.string().trim().min(2).max(256),
