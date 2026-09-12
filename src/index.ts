@@ -1,10 +1,10 @@
-import type { BotPlugin } from '../../../platform/pluginRuntime/types';
+import type { CommandPlugin } from '../../../../packages/plugin-sdk/src/command-plugin';
 import { registerWeatherAssistantTools } from './assistantTools';
 import { registerWeatherCommands } from './commands';
 import { weatherManifest } from './manifest';
 import { registerWeatherServices } from './service';
 
-export const weatherPlugin: BotPlugin = {
+export const weatherPlugin: CommandPlugin = {
   manifest: weatherManifest,
   registerCommands(context) {
     registerWeatherCommands(context);

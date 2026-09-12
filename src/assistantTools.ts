@@ -1,16 +1,15 @@
 import { z } from 'zod';
-import { logger } from '../../../platform/logging/logger';
-import type { PluginCommandContext } from '../../../platform/pluginRuntime/types';
+import type { PluginCommandContext } from '../../../../packages/plugin-sdk/src/command-plugin';
 import {
   jsonSchemaForZodObject,
   throwIfAborted,
   type AssistantTool,
   type AssistantToolContext
-} from '../../../platform/nlAssistant';
+} from '../../../../packages/plugin-sdk/src/assistant-tools';
 import { executeWeatherRequest } from './commands';
 import { WEATHER_MAX_DAY_OFFSET } from './serviceApi';
 import { WEATHER_PLUGIN_ID } from './manifest';
-import { requireStableIdentityAddress } from '../../../platform/identity/messageActor';
+import { requireStableIdentityAddress } from '../../../../packages/plugin-sdk/src/message-actor';
 
 const weatherAssistantInputSchema = z.object({
   location: z.string().trim().min(2).max(256),
@@ -86,7 +85,7 @@ function weatherQueryTool(
         return { content: { ok: true, text } };
       } catch (error) {
         throwIfAborted(toolContext.signal);
-        logger.warn({
+        pluginContext.logger?.warn({
           error,
           pluginId: WEATHER_PLUGIN_ID,
           scopeId: toolContext.scopeId

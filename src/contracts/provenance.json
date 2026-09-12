@@ -1,0 +1,24 @@
+{
+  "schemaVersion": 1,
+  "contracts": [
+    {
+      "id": "official.geocoder.v1",
+      "repository": "https://github.com/Batestinha/wabp-plugin-geocoder",
+      "commit": "9ceff00acfcba555a686deec1163c4c57a0770bc",
+      "path": "src/serviceApi.ts",
+      "upstreamSha256": "47bf9dac9dcbc01f5437b3b8d059578c125d5e57143b1d6c840f163c1efdf2a9",
+      "vendoredPath": "geocoder-v1.ts",
+      "vendoredSha256": "e7608ba7150eed2d45ce70c8b4434c8cb87fa367f626d5fafb5ea76aae26f7e4",
+      "patches": [
+        {
+          "description": "Resolve the same SDK clock contract from the local SDK during host development.",
+          "from": "@wabs/plugin-sdk/clock",
+          "to": "../../../../../packages/plugin-sdk/src/clock"
+        }
+      ],
+      "license": "MIT",
+      "licenseFile": "LICENSE.geocoder",
+      "containsProviderImplementation": false
+    }
+  ]
+}

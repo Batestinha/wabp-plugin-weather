@@ -1,15 +1,15 @@
 import { createHash } from 'node:crypto';
-import type { PluginEphemeralStore } from '../../../platform/pluginRuntime/runtime/pluginEphemeralStore';
+import type { PluginEphemeralStore } from '../../../../packages/plugin-sdk/src/ephemeral-store';
 import type {
   PluginServiceCallContext,
   PluginServiceRegistration
-} from '../../../platform/pluginRuntime/pluginServices';
-import type { PluginServiceRegistrationContext } from '../../../platform/pluginRuntime/types';
+} from '../../../../packages/plugin-sdk/src/services';
+import type { ServicePluginContext as PluginServiceRegistrationContext } from '../../../../packages/plugin-sdk/src/service-plugin';
 import {
   GEOCODER_GEOCODE_METHOD,
   GEOCODER_SERVICE_ID,
   type GeocodeOutput
-} from '../geocoder/serviceApi';
+} from './contracts/geocoder-v1';
 import { parseWeatherConfig, type WeatherConfig, type WeatherMetricFlags } from './config';
 import {
   WEATHER_QUERY_METHOD,

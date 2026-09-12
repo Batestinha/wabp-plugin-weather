@@ -1,10 +1,10 @@
-import type { CommandMetadata } from '../../../adminBot/router/commandMetadata';
-import type { CommandContext } from '../../../adminBot/router/commandRouter';
-import { tokenizeArgs } from '../../../adminBot/router/commandParser';
-import type { TranslateFn } from '../../../platform/i18n';
-import type { PluginCommandContext } from '../../../platform/pluginRuntime/types';
-import { requireStableIdentityAddress } from '../../../platform/identity/messageActor';
-import { requireScopeId } from '../shared';
+import type { CommandMetadata } from '../../../../packages/plugin-sdk/src/command-metadata';
+import type { CommandContext } from '../../../../packages/plugin-sdk/src/commands';
+import { tokenizeArgs } from '../../../../packages/plugin-sdk/src/command-parser';
+import type { TranslateFn } from '../../../../packages/plugin-sdk/src/i18n';
+import type { PluginCommandContext } from '../../../../packages/plugin-sdk/src/command-plugin';
+import { requireStableIdentityAddress } from '../../../../packages/plugin-sdk/src/message-actor';
+import { requireScopeId } from '../../../../packages/plugin-sdk/src/commands';
 import { WEATHER_PLUGIN_ID } from './manifest';
 import { renderMarineForecast } from './marineForecast';
 import { renderWeatherQuery } from './presentation';

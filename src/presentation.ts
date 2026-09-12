@@ -1,4 +1,4 @@
-import type { TranslateFn } from '../../../platform/i18n';
+import type { TranslateFn } from '../../../../packages/plugin-sdk/src/i18n';
 import type {
   WeatherCurrentOutput,
   WeatherForecastOutput,
