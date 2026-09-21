@@ -27,6 +27,7 @@ import {
   weatherQueryInputSchema,
   weatherQueryOutputSchema
 } from './serviceApi';
+import { portugalTides, type TideResult } from './tides';
 
 type JsonRecord = Record<string, unknown>;
 type WeatherMetricOverrides = {
@@ -134,16 +135,36 @@ async function fetchWeatherForecast(input: {
   const forecast = forecastDays(forecastJson);
   const requestedMarineMetrics = marineMetricKeys(input.metrics);
   let marineByDate = new Map<string, NonNullable<WeatherForecastOutput['days'][number]['marine']>>();
-  if (requestedMarineMetrics.length > 0) {
+  let tideResult: TideResult | undefined;
+  if (input.metrics.tide) {
     try {
-      const marineJson = await fetchJson(marineForecastUrl({
+      tideResult = await portugalTides({
         config: input.config,
         location: input.location,
-        metrics: input.metrics,
-        forecastDays: days
-      }), input.signal);
-      if (input.marineMode === true || marineResponseIsCoastal(marineJson, input.location)) {
-        marineByDate = marineForecastDays(marineJson, forecast.map((day) => day.date), input.metrics);
+        forecastDays: days,
+        signal: input.signal
+      });
+    } catch {
+      tideResult = undefined;
+    }
+  }
+  if (requestedMarineMetrics.length > 0) {
+    try {
+      const needsOtherMarine = input.metrics.wave || input.metrics.oceanCurrent || input.metrics.seaSurfaceTemperature;
+      const marineJson = needsOtherMarine ? await fetchJson(marineForecastUrl({
+          config: input.config,
+          location: input.location,
+          metrics: input.metrics,
+          forecastDays: days
+        }), input.signal) : {};
+      if (input.marineMode === true || tideResult?.coastal ||
+        (needsOtherMarine && marineResponseIsCoastal(marineJson, input.location))) {
+        marineByDate = marineForecastDays(
+          marineJson,
+          forecast.map((day) => day.date),
+          input.metrics,
+          tideResult?.eventsByDate
+        );
       }
     } catch {
       if (input.marineMode === true) {
@@ -159,6 +180,7 @@ async function fetchWeatherForecast(input: {
     fetchedAt: new Date().toISOString(),
     location: input.location,
     units: input.config.units,
+    ...(tideResult && (input.marineMode === true || tideResult.coastal) ? { tideContext: tideResult.context } : {}),
     days: forecast.slice(input.selection.startDay, input.selection.endDay + 1).map((day) => ({
       ...day,
       ...(marineByDate.get(day.date) ? { marine: marineByDate.get(day.date)! } : {})
@@ -328,9 +350,6 @@ function marineForecastUrl(input: {
   url.searchParams.set('timezone', input.location.timezone);
   url.searchParams.set('forecast_days', String(input.forecastDays));
   url.searchParams.set('cell_selection', 'sea');
-  if (input.metrics.tide) {
-    url.searchParams.set('minutely_15', 'sea_level_height_msl');
-  }
   if (input.metrics.wave) {
     url.searchParams.set('daily', [
       'wave_height_max',
@@ -438,10 +457,11 @@ function forecastDays(response: JsonRecord): WeatherForecastOutput['days'] {
 function marineForecastDays(
   response: JsonRecord,
   dates: string[],
-  metrics: WeatherMetricFlags
+  metrics: WeatherMetricFlags,
+  overrideTideEvents?: Map<string, WeatherTideEvent[]>
 ): Map<string, NonNullable<WeatherForecastOutput['days'][number]['marine']>> {
   const requested = marineMetricKeys(metrics);
-  const tideEventsByDate = tideEvents(response);
+  const tideEventsByDate = overrideTideEvents ?? tideEvents(response);
   const daily = record(response.daily);
   const dailyUnits = record(response.daily_units);
   const dailyDates = stringArray(daily.time);

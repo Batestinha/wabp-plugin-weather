@@ -95,5 +95,11 @@ export const weatherControls: ControlDescriptor[] = [
     type: 'string',
     format: 'url',
     required: true
-  }, { widget: 'url' }, 'Weather provider')
+  }, { widget: 'url' }, 'Weather provider'),
+  control('providerSettings.tides.institutoHidrograficoBaseUrl', 'IH tide endpoint', 'Instituto Hidrográfico OGC API base URL for recent station observations.', 520, {
+    type: 'string', format: 'url', required: true
+  }, { widget: 'url' }, 'Tide providers'),
+  control('providerSettings.tides.fculBaseUrl', 'FCUL tide endpoint', 'FCUL Portuguese harmonic tide table base URL.', 530, {
+    type: 'string', format: 'url', required: true
+  }, { widget: 'url' }, 'Tide providers')
 ];

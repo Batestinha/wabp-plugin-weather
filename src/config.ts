@@ -30,6 +30,10 @@ export const weatherProviderSettingsSchema = z.object({
   openMeteo: z.object({
     forecastBaseUrl: z.string().url().default('https://api.open-meteo.com/v1/forecast'),
     marineBaseUrl: z.string().url().default('https://marine-api.open-meteo.com/v1/marine')
+  }).default({}),
+  tides: z.object({
+    institutoHidrograficoBaseUrl: z.string().url().default('https://ogcapi.hidrografico.pt/'),
+    fculBaseUrl: z.string().url().default('https://webpages.ciencias.ulisboa.pt/~cmantunes/hidrografia/')
   }).default({})
 }).default({});
 

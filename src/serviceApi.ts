@@ -75,6 +75,21 @@ export const weatherTideEventSchema = z.object({
   height: weatherMetricValueSchema
 }).strict();
 
+export const weatherTideContextSchema = z.object({
+  forecastSource: z.enum(['fcul', 'open-meteo']),
+  datum: z.enum(['zh-portugal', 'mean-sea-level', 'ih-anchored-approximate-zh']),
+  quality: z.enum(['calibrated-prediction', 'modelled', 'crude-current-anchor']),
+  station: z.object({ id: z.string(), name: z.string(), distanceKm: z.number() }).strict().optional(),
+  observation: z.object({ time: z.string(), height: weatherMetricValueSchema }).strict().optional(),
+  calibration: z.object({ method: z.literal('fixed-station-offset'), offset: weatherMetricValueSchema }).strict().optional(),
+  adjustment: z.object({
+    at: z.string(),
+    ihHeight: weatherMetricValueSchema,
+    openMeteoHeight: weatherMetricValueSchema,
+    offset: weatherMetricValueSchema
+  }).strict().optional()
+}).strict();
+
 export const weatherReportLocationSchema = weatherServiceLocationSchema;
 
 export const weatherReportUnitsSchema = z.object({
@@ -136,6 +151,7 @@ export const weatherForecastReportSchema = z.object({
   fetchedAt: z.string(),
   location: weatherReportLocationSchema,
   units: weatherReportUnitsSchema,
+  tideContext: weatherTideContextSchema.optional(),
   days: z.array(weatherForecastDaySchema)
 }).strict();
 
@@ -158,6 +174,7 @@ export type WeatherMarineMode = WeatherQueryInput['includeMarine'];
 export type WeatherMetricValue = z.infer<typeof weatherMetricValueSchema>;
 export type WeatherMarineMetricKey = z.infer<typeof weatherMarineMetricKeySchema>;
 export type WeatherTideEvent = z.infer<typeof weatherTideEventSchema>;
+export type WeatherTideContext = z.infer<typeof weatherTideContextSchema>;
 export type WeatherCurrentOutput = z.infer<typeof weatherCurrentReportSchema>;
 export type WeatherForecastOutput = z.infer<typeof weatherForecastReportSchema>;
 export type WeatherQueryOutput = z.infer<typeof weatherQueryOutputSchema>;

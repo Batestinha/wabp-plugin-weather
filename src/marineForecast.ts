@@ -7,7 +7,7 @@ export function renderMarineForecast(
   locale: string
 ): string | undefined {
   const sections = report.days
-    .map((day) => marineForecastDayLines(report.location.label, day, t, locale))
+    .map((day) => marineForecastDayLines(report.location.label, day, report.tideContext, t, locale))
     .filter((lines) => lines.length > 0);
   return sections.length > 0
     ? sections.map((lines) => lines.join('\n')).join('\n\n')
@@ -17,6 +17,7 @@ export function renderMarineForecast(
 function marineForecastDayLines(
   location: string,
   day: WeatherForecastOutput['days'][number],
+  tideContext: WeatherForecastOutput['tideContext'],
   t: TranslateFn,
   locale: string
 ): string[] {
@@ -31,6 +32,19 @@ function marineForecastDayLines(
       place: location,
       startDate: formatForecastDate(day.date)
     }));
+    if (tideContext) {
+      lines.push(t(
+        tideContext.quality === 'crude-current-anchor'
+          ? 'official.weather.tideTimes.sourceCrude'
+          : tideContext.forecastSource === 'fcul'
+            ? 'official.weather.tideTimes.sourceFcul'
+            : 'official.weather.tideTimes.sourceMsl',
+        {
+          station: tideContext.station?.name ?? location,
+          offset: tideContext.adjustment ? formatMetric(tideContext.adjustment.offset, locale, 2) : ''
+        }
+      ));
+    }
     if (marine.unavailable.includes('tide')) {
       lines.push(t('official.weather.metric.unavailable', {
         metric: t('official.weather.metric.tide')

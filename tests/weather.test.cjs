@@ -33,7 +33,10 @@ test('preserves customized units, metrics, endpoints and disabled state', async 
   const settings = { enabled: false, cacheTtlSeconds: 120,
     units: { temperatureUnit: 'fahrenheit', windSpeedUnit: 'mph', precipitationUnit: 'inch' },
     metrics: { wave: true, temperature: false },
-    providerSettings: { openMeteo: { forecastBaseUrl: 'https://weather.example.invalid/forecast', marineBaseUrl: 'https://weather.example.invalid/marine' } }
+    providerSettings: {
+      openMeteo: { forecastBaseUrl: 'https://weather.example.invalid/forecast', marineBaseUrl: 'https://weather.example.invalid/marine' },
+      tides: { institutoHidrograficoBaseUrl: 'https://ih.example.invalid/', fculBaseUrl: 'https://fcul.example.invalid/' }
+    }
   };
   const resolved = plugin.manifest.configSchema.parse(settings);
   assert.equal(resolved.enabled, false);
@@ -94,7 +97,7 @@ test('ships complete Portuguese catalogs, matching controls and immutable upstre
   const metadata = JSON.parse(fs.readFileSync('wa-plugin.json'));
   const pt = JSON.parse(fs.readFileSync('locales/pt-PT/official.weather.json'));
   for (const key of Object.keys(plugin.manifest.defaultMessages)) assert.ok(pt[key]?.trim(), key);
-  assert.equal(metadata.operatorConsole.controls.length, 18);
+  assert.equal(metadata.operatorConsole.controls.length, 20);
   assert.equal(metadata.pluginId, plugin.manifest.pluginId);
   const contracts = JSON.parse(fs.readFileSync('contracts/provenance.json'));
   for (const item of contracts.contracts) {

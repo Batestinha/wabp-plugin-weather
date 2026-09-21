@@ -4,7 +4,7 @@
   "name": "Weather",
   "description": "Location-based current weather and forecasts.",
   "kind": "managed_group",
-  "version": "0.4.2",
+  "version": "0.5.0",
   "coreApiRange": "^0.3.0",
   "entrypoint": "dist/index.js",
   "messageNamespace": "official.weather",
@@ -120,7 +120,9 @@
       "metrics.oceanCurrent",
       "metrics.seaSurfaceTemperature",
       "providerSettings.openMeteo.forecastBaseUrl",
-      "providerSettings.openMeteo.marineBaseUrl"
+      "providerSettings.openMeteo.marineBaseUrl",
+      "providerSettings.tides.institutoHidrograficoBaseUrl",
+      "providerSettings.tides.fculBaseUrl"
     ],
     "controls": [
       {
@@ -536,6 +538,46 @@
         },
         "ui": {
           "helpText": "Open-Meteo marine API base URL.",
+          "widget": "url"
+        },
+        "relatedCommandIds": [
+          "/weather"
+        ]
+      },
+      {
+        "id": "plugin.official.weather.providerSettings.tides.institutoHidrograficoBaseUrl",
+        "path": "providerSettings.tides.institutoHidrograficoBaseUrl",
+        "label": "IH tide endpoint",
+        "description": "Instituto Hidrográfico OGC API base URL for recent station observations.",
+        "section": "Tide providers",
+        "order": 520,
+        "schema": {
+          "type": "string",
+          "format": "url",
+          "required": true
+        },
+        "ui": {
+          "helpText": "Instituto Hidrográfico OGC API base URL for recent station observations.",
+          "widget": "url"
+        },
+        "relatedCommandIds": [
+          "/weather"
+        ]
+      },
+      {
+        "id": "plugin.official.weather.providerSettings.tides.fculBaseUrl",
+        "path": "providerSettings.tides.fculBaseUrl",
+        "label": "FCUL tide endpoint",
+        "description": "FCUL Portuguese harmonic tide table base URL.",
+        "section": "Tide providers",
+        "order": 530,
+        "schema": {
+          "type": "string",
+          "format": "url",
+          "required": true
+        },
+        "ui": {
+          "helpText": "FCUL Portuguese harmonic tide table base URL.",
           "widget": "url"
         },
         "relatedCommandIds": [
