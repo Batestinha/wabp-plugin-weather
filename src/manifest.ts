@@ -11,7 +11,7 @@ export const WEATHER_PLUGIN_ID = 'official.weather';
 export const weatherManifest: PluginManifest = {
   pluginId: WEATHER_PLUGIN_ID,
   kind: 'managed_group',
-  version: '0.5.0',
+  version: '0.5.1',
   coreApiRange: '^0.3.0',
   messageNamespace: 'official.weather',
   descriptionKey: 'official.weather.description',
