@@ -183,7 +183,14 @@ function groupEvents(events: WeatherTideEvent[], timezone: string) {
 }
 
 function localDate(timestamp: number, timezone: string) {
-  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(timestamp);
+  let formatter: Intl.DateTimeFormat;
+  try {
+    formatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' });
+  } catch (error) {
+    if (!(error instanceof RangeError)) throw error;
+    formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'UTC', year: 'numeric', month: '2-digit', day: '2-digit' });
+  }
+  const parts = formatter.formatToParts(timestamp);
   const value = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
   return `${value('year')}-${value('month')}-${value('day')}`;
 }
