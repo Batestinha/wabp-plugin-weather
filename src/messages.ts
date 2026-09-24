@@ -44,7 +44,7 @@ export const weatherMessages: MessageCatalog = {
   'official.weather.tideTimes.title': 'Tide times for {place}, {startDate}:',
   'official.weather.tideTimes.high': 'High Tide {time} ({height})',
   'official.weather.tideTimes.low': 'Low Tide {time} ({height})',
-  'official.weather.tideTimes.sourceFcul': 'IH current at {station}; calibrated FCUL forecast (Portuguese chart datum).',
+  'official.weather.tideTimes.sourceFcul': 'FCUL tide forecast at {station} (Portuguese chart datum); approximate for nearby places.',
   'official.weather.tideTimes.sourceCrude': 'Crude IH-anchored Open-Meteo estimate at {station}; constant offset {offset}, not an official datum conversion.',
   'official.weather.tideTimes.sourceMsl': 'Open-Meteo model estimate relative to mean sea level.',
   'official.weather.metric.tide': 'Sea level / tide',

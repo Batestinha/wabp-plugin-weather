@@ -193,3 +193,64 @@ test('leaves an Open-Meteo fallback uncorrected when nearby IH readings are stal
   assert.equal(result.context.adjustment, undefined);
   assert.equal(result.context.station, undefined);
 });
+
+test('selects FCUL tides across mainland and island coasts with the same station rule', async () => {
+  const { portugalTides } = require('../dist/tides.js');
+  const { parseWeatherConfig } = require('../dist/config.js');
+  const cases = [
+    { label: 'Nazaré', latitude: 39.60, longitude: -9.08, station: 'Peniche', file: 'PenicheFCUL' },
+    { label: 'Tavira', latitude: 37.12, longitude: -7.65, station: 'Vila Real de Santo António', file: 'VilaRealFCUL' },
+    { label: 'Ponta Delgada', latitude: 37.736, longitude: -25.671, station: 'Ponta Delgada', file: 'PontaDelgada' },
+    { label: 'Funchal', latitude: 32.644, longitude: -16.912, station: 'Funchal', file: 'Funchal' }
+  ];
+  const year = new Date().getUTCFullYear();
+  for (const place of cases) {
+    const urls = [];
+    global.fetch = async url => {
+      const value = String(url);
+      urls.push(value);
+      if (value.includes('/marine')) return { ok: true, json: async () => ({
+        latitude: place.latitude, longitude: place.longitude,
+        minutely_15: { time: ['2026-09-24T11:00', '2026-09-24T11:15', '2026-09-24T11:30'], sea_level_height_msl: [0, 1, 0] }
+      }) };
+      if (value.includes(`${place.file}${year}.TXT`)) return { ok: true, text: async () =>
+        `${year}-09-26   1:10  3.45  Preia-Mar\n${year}-09-26   7:20  0.83  Baixa-Mar\n`
+      };
+      return { ok: false, text: async () => '' };
+    };
+    const result = await portugalTides({
+      config: parseWeatherConfig({}),
+      location: { label: place.label, latitude: place.latitude, longitude: place.longitude, timezone: 'Europe/Lisbon' },
+      forecastDays: 3
+    });
+    assert.equal(result.context.forecastSource, 'fcul', place.label);
+    assert.equal(result.context.station.name, place.station, place.label);
+    assert.ok(urls.some(url => url.includes(`${place.file}${year}.TXT`)), place.label);
+    assert.deepEqual(result.eventsByDate.get(`${year}-09-26`).map(event => event.height.value), [3.45, 0.83]);
+  }
+});
+
+test('does not present a distant FCUL port as a local inland tide forecast', async () => {
+  const { portugalTides } = require('../dist/tides.js');
+  const { parseWeatherConfig } = require('../dist/config.js');
+  const now = Math.floor(Date.now() / 900_000) * 900_000;
+  const urls = [];
+  global.fetch = async url => {
+    const value = String(url);
+    urls.push(value);
+    if (value.includes('instances/l1/locations')) return { ok: true, json: async () => ({ features: [] }) };
+    if (value.includes('/marine')) return { ok: true, json: async () => ({
+      latitude: 40.15, longitude: -8.85,
+      minutely_15: { time: [-1, 0, 1].map(step => new Date(now + step * 900_000).toISOString().slice(0, 16)), sea_level_height_msl: [0, 1, 0] }
+    }) };
+    throw new Error('Unexpected official table request for inland place');
+  };
+  const result = await portugalTides({
+    config: parseWeatherConfig({}),
+    location: { label: 'Coimbra', latitude: 40.21, longitude: -8.43, timezone: 'Europe/Lisbon' },
+    forecastDays: 3
+  });
+  assert.equal(result.coastal, false);
+  assert.equal(result.context.forecastSource, 'open-meteo');
+  assert.equal(urls.some(url => url.includes('FCUL')), false);
+});

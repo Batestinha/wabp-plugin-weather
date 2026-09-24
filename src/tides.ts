@@ -1,22 +1,12 @@
 import type { WeatherConfig } from './config';
 import type { WeatherServiceLocation, WeatherTideContext, WeatherTideEvent } from './serviceApi';
+import { PORTUGUESE_TIDE_STATIONS, type TideStation } from './tideStations';
 
 type JsonRecord = Record<string, unknown>;
-type Profile = {
-  name: string; latitude: number; longitude: number; radiusKm: number;
-  file: string; correction: number; names: string[]; ids: string[];
-};
 
-const PROFILES: Profile[] = [
-  { name: 'Leixões', latitude: 41.1855, longitude: -8.7040, radiusKm: 15, file: 'LeixoesFCUL%d.TXT', correction: -0.28, names: ['leixões'], ids: ['159-294', '12-184'] },
-  { name: 'Aveiro', latitude: 40.6433, longitude: -8.7487, radiusKm: 15, file: 'AveiroFCUL%d.TXT', correction: -0.26, names: ['aveiro'], ids: ['160-285'] },
-  { name: 'Peniche', latitude: 39.3558, longitude: -9.3811, radiusKm: 15, file: 'PenicheFCUL%d.TXT', correction: -0.26, names: ['peniche'], ids: ['162-309'] },
-  { name: 'Cascais', latitude: 38.694, longitude: -9.418392, radiusKm: 15, file: 'CascaisFCUL%d.TXT', correction: 0, names: ['cascais'], ids: [] },
-  { name: 'Lisboa — Alcântara', latitude: 38.7018, longitude: -9.1678, radiusKm: 15, file: 'LisboaFCUL%d.TXT', correction: -0.25, names: ['lisboa - alcântara', 'lisboa alcântara'], ids: ['152-303'] },
-  { name: 'Sesimbra', latitude: 38.4398, longitude: -9.1104, radiusKm: 15, file: 'Sesimbra%d.TXT', correction: -0.26, names: ['sesimbra'], ids: ['156-279', '28-297'] },
-  { name: 'Vila Real de Santo António', latitude: 37.1950, longitude: -7.4154, radiusKm: 15, file: 'VilaRealFCUL%d.TXT', correction: -0.27, names: ['vila real'], ids: ['151-281'] },
-  { name: 'Funchal', latitude: 32.6448, longitude: -16.9108, radiusKm: 20, file: 'Funchal%d.TXT', correction: -0.13, names: ['funchal'], ids: ['1001-307', '121-183'] }
-];
+const MAX_STATION_DISTANCE_KM = 120;
+const DIRECT_COASTAL_STATION_DISTANCE_KM = 15;
+const MAX_SEA_CELL_DISTANCE_KM = 35;
 
 export type TideResult = {
   eventsByDate: Map<string, WeatherTideEvent[]>;
@@ -30,25 +20,33 @@ export async function portugalTides(input: {
   forecastDays: number;
   signal?: AbortSignal | undefined;
 }): Promise<TideResult> {
-  const profile = nearestProfile(input.location.latitude, input.location.longitude);
-  const fcul = profile ? await fetchFcul(input.config, profile, input.signal).catch(() => undefined) : undefined;
-
-  if (profile && fcul && fcul.length > 0) {
-    return {
-      coastal: true,
-      eventsByDate: groupEvents(fcul, input.location.timezone),
-      context: {
-        forecastSource: 'fcul', datum: 'zh-portugal', quality: 'calibrated-prediction',
-        station: {
-          id: `fcul:${profile.name}`, name: profile.name,
-          distanceKm: distanceKm(input.location.latitude, input.location.longitude, profile.latitude, profile.longitude)
-        },
-        calibration: { method: 'fixed-station-offset', offset: { value: profile.correction, unit: 'm' } }
+  const stations = nearestStations(input.location.latitude, input.location.longitude);
+  let openMeteo: Awaited<ReturnType<typeof fetchOpenMeteo>> | undefined;
+  const nearestDistance = stations[0]?.distance ?? Number.POSITIVE_INFINITY;
+  if (nearestDistance > DIRECT_COASTAL_STATION_DISTANCE_KM) {
+    openMeteo = await fetchOpenMeteo(input.config, input.location, input.forecastDays, input.signal)
+      .catch(() => undefined);
+  }
+  const coastal = nearestDistance <= DIRECT_COASTAL_STATION_DISTANCE_KM ||
+    (openMeteo !== undefined &&
+      distanceKm(input.location.latitude, input.location.longitude, openMeteo.latitude, openMeteo.longitude) <= MAX_SEA_CELL_DISTANCE_KM);
+  if (coastal) {
+    for (const { station, distance } of stations.slice(0, 3)) {
+      const events = await fetchFcul(input.config, station, input.signal).catch(() => undefined);
+      if (events && events.length > 0) {
+        return {
+          coastal: true,
+          eventsByDate: groupEvents(events, input.location.timezone),
+          context: {
+            forecastSource: 'fcul', datum: 'zh-portugal', quality: 'calibrated-prediction',
+            station: { id: `fcul:${station.name}`, name: station.name, distanceKm: distance }
+          }
+        };
       }
-    };
+    }
   }
 
-  const observation = await fetchObservation(input.config, input.location, profile, input.signal).catch(() => undefined);
+  const observation = await fetchObservation(input.config, input.location, input.signal).catch(() => undefined);
   const station = observation ? {
     id: observation.stationId, name: observation.stationName, distanceKm: observation.distanceKm
   } : undefined;
@@ -61,11 +59,13 @@ export async function portugalTides(input: {
   const marineLocation = observation ? {
     ...input.location, latitude: observation.latitude, longitude: observation.longitude
   } : input.location;
-  const openMeteo = await fetchOpenMeteo(input.config, marineLocation, input.forecastDays, input.signal);
-  const coastal = distanceKm(input.location.latitude, input.location.longitude, openMeteo.latitude, openMeteo.longitude) <= 35;
+  openMeteo = observation || !openMeteo
+    ? await fetchOpenMeteo(input.config, marineLocation, input.forecastDays, input.signal)
+    : openMeteo;
+  const fallbackCoastal = distanceKm(input.location.latitude, input.location.longitude, openMeteo.latitude, openMeteo.longitude) <= MAX_SEA_CELL_DISTANCE_KM;
   let offset = 0;
   let adjustment: WeatherTideContext['adjustment'];
-  if (profile && observation) {
+  if (observation) {
     const raw = interpolate(openMeteo.samples, Date.parse(observation.time));
     if (raw !== undefined && Math.abs(observation.height - raw) <= 5) {
       offset = observation.height - raw;
@@ -79,7 +79,7 @@ export async function portugalTides(input: {
   }
   const samples = openMeteo.samples.map((sample) => ({ ...sample, height: sample.height + offset }));
   return {
-    coastal,
+    coastal: fallbackCoastal,
     eventsByDate: extrema(samples, input.location.timezone),
     context: {
       forecastSource: 'open-meteo',
@@ -93,7 +93,7 @@ export async function portugalTides(input: {
 }
 
 async function fetchObservation(
-  config: WeatherConfig, location: WeatherServiceLocation, profile?: Profile, signal?: AbortSignal
+  config: WeatherConfig, location: WeatherServiceLocation, signal?: AbortSignal
 ) {
   const base = ensureSlash(config.providerSettings.tides.institutoHidrograficoBaseUrl);
   const response = await fetch(`${base}collections/tide_obs_nrt/instances/l1/locations?f=json&limit=100`, signal ? { signal } : undefined);
@@ -119,20 +119,19 @@ async function fetchObservation(
       return {
         stationId, stationName: String(properties.title ?? stationId), latitude, longitude,
         distanceKm: distanceKmFromLocation, time: new Date(timestamp).toISOString(), height,
-        preferred: profile?.ids.includes(stationId) ?? false
       };
     })
     .filter((item): item is NonNullable<typeof item> => item !== undefined)
-    .sort((a, b) => Number(b.preferred) - Number(a.preferred) || a.distanceKm - b.distanceKm);
+    .sort((a, b) => a.distanceKm - b.distanceKm);
   if (candidates[0]) return candidates[0];
   throw new Error('No fresh IH observation');
 }
 
-async function fetchFcul(config: WeatherConfig, profile: Profile, signal?: AbortSignal): Promise<WeatherTideEvent[]> {
+async function fetchFcul(config: WeatherConfig, station: TideStation, signal?: AbortSignal): Promise<WeatherTideEvent[]> {
   const base = ensureSlash(config.providerSettings.tides.fculBaseUrl);
   const year = new Date().getUTCFullYear();
   const texts = await Promise.all([year - 1, year, year + 1].map(async (item) => {
-    const response = await fetch(base + profile.file.replace('%d', String(item)), signal ? { signal } : undefined);
+    const response = await fetch(base + station.file.replace('%d', String(item)), signal ? { signal } : undefined);
     return response.ok ? response.text() : '';
   }));
   const events: WeatherTideEvent[] = [];
@@ -142,7 +141,7 @@ async function fetchFcul(config: WeatherConfig, profile: Profile, signal?: Abort
       events.push({
         type: match[4] === 'Preia-Mar' ? 'high' : 'low',
         time: `${match[1]}T${match[2]!.padStart(5, '0')}:00Z`,
-        height: { value: Number(match[3]) + profile.correction, unit: 'm' }
+        height: { value: Number(match[3]), unit: 'm' }
       });
     }
   }
@@ -213,9 +212,11 @@ function interpolate(samples: { time: number; height: number }[], timestamp: num
   return undefined;
 }
 
-function nearestProfile(latitude: number, longitude: number) {
-  return PROFILES.map((profile) => ({ profile, distance: distanceKm(latitude, longitude, profile.latitude, profile.longitude) }))
-    .filter((item) => item.distance <= item.profile.radiusKm).sort((a, b) => a.distance - b.distance)[0]?.profile;
+function nearestStations(latitude: number, longitude: number) {
+  return PORTUGUESE_TIDE_STATIONS
+    .map((station) => ({ station, distance: distanceKm(latitude, longitude, station.latitude, station.longitude) }))
+    .filter(({ distance }) => distance <= MAX_STATION_DISTANCE_KM)
+    .sort((a, b) => a.distance - b.distance);
 }
 function distanceKm(a: number, b: number, c: number, d: number) { const r = (x: number) => x * Math.PI / 180; const x = Math.sin(r(c - a) / 2) ** 2 + Math.cos(r(a)) * Math.cos(r(c)) * Math.sin(r(d - b) / 2) ** 2; return 6371.0088 * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x)); }
 function ensureSlash(value: string) { return value.endsWith('/') ? value : `${value}/`; }

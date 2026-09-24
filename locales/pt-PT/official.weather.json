@@ -42,7 +42,7 @@
   "official.weather.tideTimes.title": "Horas das mares para {place}, {startDate}:",
   "official.weather.tideTimes.high": "Mare cheia {time} ({height})",
   "official.weather.tideTimes.low": "Mare baixa {time} ({height})",
-  "official.weather.tideTimes.sourceFcul": "Nivel atual do IH em {station}; previsao FCUL calibrada (Zero Hidrografico portugues).",
+  "official.weather.tideTimes.sourceFcul": "Previsao de mare da FCUL em {station} (Zero Hidrografico portugues); aproximada para locais proximos.",
   "official.weather.tideTimes.sourceCrude": "Estimativa Open-Meteo rudimentar ancorada no IH em {station}; deslocamento constante {offset}, nao e uma conversao oficial de datum.",
   "official.weather.tideTimes.sourceMsl": "Estimativa do modelo Open-Meteo relativa ao nivel medio do mar.",
   "official.weather.metric.tide": "Nivel do mar / mare",
