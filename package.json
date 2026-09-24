@@ -1,6 +1,6 @@
 {
   "name": "@wabs/plugin-weather",
-  "version": "0.5.1",
+  "version": "0.5.4",
   "description": "Location-based current weather and forecasts.",
   "license": "MIT",
   "private": true,
