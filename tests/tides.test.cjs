@@ -97,6 +97,7 @@ test('forecast-only ports use FCUL identifiers and no IH request', async () => {
     assert.equal(result.context.forecastSource, 'fcul', name);
     assert.equal(result.context.current?.estimated, true, name);
     assert.ok(requests.some(({ url }) => url.pathname.endsWith(`${stem}${new Date().getUTCFullYear()}.TXT`)), name);
+    assert.equal(requests.some(({ url }) => url.hostname === 'marine-api.open-meteo.com'), false, name);
     if (name === 'Cascais' || name === 'Sagres' || name === 'Lagos' || name === 'Albufeira') {
       assert.equal(result.context.station.id, `fcul:${stem.replace(/FCUL$/, '').toLowerCase()}`);
       assert.equal(requests.some(({ url }) => url.hostname === 'ogcapi.hidrografico.pt'), false);

@@ -14,14 +14,14 @@ const PROFILES: Profile[] = [
   { name: 'Figueira da Foz', latitude: 40.1470267, longitude: -8.8532498, radiusKm: 15, file: 'FigueiraFCUL%d.TXT', correction: -0.28, ids: ['866-295', '896-296'] },
   { name: 'Peniche', latitude: 39.3535667, longitude: -9.3674056, radiusKm: 15, file: 'PenicheFCUL%d.TXT', correction: -0.26, ids: ['855-305', '162-309'] },
   { name: 'Cascais', latitude: 38.6944444, longitude: -9.4180556, radiusKm: 15, file: 'CascaisFCUL%d.TXT', correction: -0.28, ids: [] },
-  { name: 'Lisboa — Alcântara', latitude: 38.7001940, longitude: -9.1632500, radiusKm: 15, file: 'LisboaFCUL%d.TXT', correction: -0.25, ids: ['152-303', '897-298'] },
-  { name: 'Setúbal — Tróia', latitude: 38.4944358, longitude: -8.9007503, radiusKm: 15, file: 'SetubalFCUL%d.TXT', correction: -0.26, ids: ['20-311', '898-299'] },
+  { name: 'Lisboa — Alcântara', latitude: 38.7001940, longitude: -9.1632500, radiusKm: 15, file: 'LisboaFCUL%d.TXT', correction: -0.25, ids: ['897-298', '152-303'] },
+  { name: 'Setúbal — Tróia', latitude: 38.4944358, longitude: -8.9007503, radiusKm: 15, file: 'SetubalFCUL%d.TXT', correction: -0.26, ids: ['898-299', '20-311'] },
   { name: 'Sines', latitude: 37.9487403, longitude: -8.8884982, radiusKm: 15, file: 'SinesFCUL%d.TXT', correction: -0.26, ids: ['43-269', '900-306'] },
   { name: 'Sagres', latitude: 37.0060, longitude: -8.9430, radiusKm: 15, file: 'SagresFCUL%d.TXT', correction: -0.28, ids: [] },
   { name: 'Lagos', latitude: 37.0986111, longitude: -8.6666667, radiusKm: 15, file: 'LagosFCUL%d.TXT', correction: -0.33, ids: [] },
   { name: 'Albufeira', latitude: 37.0870, longitude: -8.2510, radiusKm: 15, file: 'AlbufeiraFCUL%d.TXT', correction: -0.28, ids: [] },
   { name: 'Faro', latitude: 36.9778027, longitude: -7.8663946, radiusKm: 15, file: 'FaroFCUL%d.TXT', correction: -0.26, ids: ['19-259'] },
-  { name: 'Vila Real de Santo António', latitude: 37.1934389, longitude: -7.4133917, radiusKm: 15, file: 'VilaRealFCUL%d.TXT', correction: -0.27, ids: ['21-185', '151-281'] },
+  { name: 'Vila Real de Santo António', latitude: 37.1934389, longitude: -7.4133917, radiusKm: 15, file: 'VilaRealFCUL%d.TXT', correction: -0.27, ids: ['151-281', '21-185'] },
   { name: 'Sesimbra', latitude: 38.4397973, longitude: -9.1103589, radiusKm: 15, file: 'Sesimbra%d.TXT', correction: -0.26, ids: ['28-297', '156-279'] },
   { name: 'Funchal', latitude: 32.6447835, longitude: -16.9107824, radiusKm: 20, file: 'Funchal%d.TXT', correction: -0.13, ids: ['121-183', '1001-307'] },
   { name: 'Ponta Delgada', latitude: 37.7355975, longitude: -25.6714190, radiusKm: 15, file: 'PontaDelgada%d.TXT', correction: -0.13, ids: ['212-286'] },
@@ -43,7 +43,7 @@ export async function portugalTides(input: {
   signal?: AbortSignal | undefined;
 }): Promise<TideResult> {
   const profile = nearestProfile(input.location.latitude, input.location.longitude);
-  const [observation, fcul, openMeteo] = await Promise.all([
+  const [observation, fcul] = await Promise.all([
     profile?.ids.length ? fetchObservation(input.config, profile, input.signal).catch((error) => {
       if (input.signal?.aborted) throw error;
       return undefined;
@@ -51,15 +51,8 @@ export async function portugalTides(input: {
     profile ? fetchFcul(input.config, profile, input.signal).catch((error) => {
       if (input.signal?.aborted) throw error;
       return undefined;
-    }) : undefined,
-    fetchOpenMeteo(input.config, input.location, input.forecastDays, input.signal).catch((error) => {
-      if (input.signal?.aborted) throw error;
-      return undefined;
-    })
+    }) : undefined
   ]);
-  const coastal = openMeteo
-    ? distanceKm(input.location.latitude, input.location.longitude, openMeteo.latitude, openMeteo.longitude) <= 35
-    : profile !== undefined;
   const station = profile ? {
     id: observation?.stationId ?? `fcul:${profile.file.slice(0, profile.file.indexOf('%d')).replace(/FCUL$/, '').toLowerCase()}`,
     name: profile.name,
@@ -73,7 +66,7 @@ export async function portugalTides(input: {
   if (profile && fcul && fcul.length > 0) {
     const currentHeight = observation?.height ?? interpolateFcul(fcul, Date.now());
     return {
-      coastal,
+      coastal: true,
       eventsByDate: groupEvents(fcul, input.location.timezone),
       context: {
         forecastSource: 'fcul', datum: 'zh-portugal', quality: 'calibrated-prediction',
@@ -88,7 +81,8 @@ export async function portugalTides(input: {
     };
   }
 
-  if (!openMeteo) throw new Error('No tide forecast available');
+  const openMeteo = await fetchOpenMeteo(input.config, input.location, input.forecastDays, input.signal);
+  const coastal = distanceKm(input.location.latitude, input.location.longitude, openMeteo.latitude, openMeteo.longitude) <= 35;
 
   let offset = 0;
   let adjustment: WeatherTideContext['adjustment'];
@@ -112,8 +106,8 @@ export async function portugalTides(input: {
       forecastSource: 'open-meteo',
       datum: adjustment ? 'ih-anchored-approximate-zh' : 'mean-sea-level',
       quality: adjustment ? 'crude-current-anchor' : 'modelled',
-      ...(station ? { station } : {}),
-      ...(observationContext ? { observation: observationContext } : {}),
+      ...(adjustment && station ? { station } : {}),
+      ...(adjustment && observationContext ? { observation: observationContext } : {}),
       ...(adjustment ? { adjustment } : {})
     }
   };
