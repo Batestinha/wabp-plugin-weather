@@ -108,3 +108,29 @@ test('ships complete Portuguese catalogs, matching controls and immutable upstre
     }
   }
 });
+
+
+test('uses FCUL Cascais tides for the Sintra event location without an Open-Meteo tide request', async () => {
+  const { portugalTides } = require('../dist/tides.js');
+  const { parseWeatherConfig } = require('../dist/config.js');
+  const urls = [];
+  global.fetch = async url => {
+    urls.push(String(url));
+    if (!String(url).includes('CascaisFCUL2026.TXT')) {
+      return { ok: false, text: async () => '' };
+    }
+    return { ok: true, text: async () =>
+      '  Data       Hora   Alt    Maré\n2026-09-26   1:10  3.45  Preia-Mar\n2026-09-26   7:20  0.83  Baixa-Mar\n'
+    };
+  };
+  const result = await portugalTides({
+    config: parseWeatherConfig({}),
+    location: { label: 'Cascais/Sintra (Por decidir)', latitude: 38.79846, longitude: -9.3881, timezone: 'Europe/Lisbon' },
+    forecastDays: 3
+  });
+  assert.equal(result.context.forecastSource, 'fcul');
+  assert.equal(result.context.station.name, 'Cascais');
+  assert.equal(result.context.datum, 'zh-portugal');
+  assert.deepEqual(result.eventsByDate.get('2026-09-26').map(event => event.height.value), [3.45, 0.83]);
+  assert.equal(urls.some(url => url.includes('open-meteo')), false);
+});

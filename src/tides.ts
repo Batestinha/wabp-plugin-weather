@@ -11,6 +11,7 @@ const PROFILES: Profile[] = [
   { name: 'Leixões', latitude: 41.1855, longitude: -8.7040, radiusKm: 15, file: 'LeixoesFCUL%d.TXT', correction: -0.28, names: ['leixões'], ids: ['159-294', '12-184'] },
   { name: 'Aveiro', latitude: 40.6433, longitude: -8.7487, radiusKm: 15, file: 'AveiroFCUL%d.TXT', correction: -0.26, names: ['aveiro'], ids: ['160-285'] },
   { name: 'Peniche', latitude: 39.3558, longitude: -9.3811, radiusKm: 15, file: 'PenicheFCUL%d.TXT', correction: -0.26, names: ['peniche'], ids: ['162-309'] },
+  { name: 'Cascais', latitude: 38.694, longitude: -9.418392, radiusKm: 15, file: 'CascaisFCUL%d.TXT', correction: 0, names: ['cascais'], ids: [] },
   { name: 'Lisboa — Alcântara', latitude: 38.7018, longitude: -9.1678, radiusKm: 15, file: 'LisboaFCUL%d.TXT', correction: -0.25, names: ['lisboa - alcântara', 'lisboa alcântara'], ids: ['152-303'] },
   { name: 'Sesimbra', latitude: 38.4398, longitude: -9.1104, radiusKm: 15, file: 'Sesimbra%d.TXT', correction: -0.26, names: ['sesimbra'], ids: ['156-279', '28-297'] },
   { name: 'Vila Real de Santo António', latitude: 37.1950, longitude: -7.4154, radiusKm: 15, file: 'VilaRealFCUL%d.TXT', correction: -0.27, names: ['vila real'], ids: ['151-281'] },
@@ -30,14 +31,12 @@ export async function portugalTides(input: {
   signal?: AbortSignal | undefined;
 }): Promise<TideResult> {
   const profile = nearestProfile(input.location.latitude, input.location.longitude);
-  const [observation, fcul, openMeteo] = await Promise.all([
-    profile ? fetchObservation(input.config, profile, input.signal).catch(() => undefined) : undefined,
-    profile ? fetchFcul(input.config, profile, input.signal).catch(() => undefined) : undefined,
-    fetchOpenMeteo(input.config, input.location, input.forecastDays, input.signal)
+  const [observation, fcul] = await Promise.all([
+    profile?.ids.length ? fetchObservation(input.config, profile, input.signal).catch(() => undefined) : undefined,
+    profile ? fetchFcul(input.config, profile, input.signal).catch(() => undefined) : undefined
   ]);
-  const coastal = distanceKm(input.location.latitude, input.location.longitude, openMeteo.latitude, openMeteo.longitude) <= 35;
   const station = profile ? {
-    id: observation?.stationId ?? profile.ids[0]!,
+    id: observation?.stationId ?? profile.ids[0] ?? `fcul:${profile.name}`,
     name: profile.name,
     distanceKm: distanceKm(input.location.latitude, input.location.longitude, profile.latitude, profile.longitude)
   } : undefined;
@@ -48,7 +47,7 @@ export async function portugalTides(input: {
 
   if (profile && fcul && fcul.length > 0) {
     return {
-      coastal,
+      coastal: true,
       eventsByDate: groupEvents(fcul, input.location.timezone),
       context: {
         forecastSource: 'fcul', datum: 'zh-portugal', quality: 'calibrated-prediction',
@@ -59,6 +58,8 @@ export async function portugalTides(input: {
     };
   }
 
+  const openMeteo = await fetchOpenMeteo(input.config, input.location, input.forecastDays, input.signal);
+  const coastal = distanceKm(input.location.latitude, input.location.longitude, openMeteo.latitude, openMeteo.longitude) <= 35;
   let offset = 0;
   let adjustment: WeatherTideContext['adjustment'];
   if (profile && observation) {
@@ -183,7 +184,14 @@ function groupEvents(events: WeatherTideEvent[], timezone: string) {
 }
 
 function localDate(timestamp: number, timezone: string) {
-  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(timestamp);
+  let formatter: Intl.DateTimeFormat;
+  try {
+    formatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' });
+  } catch (error) {
+    if (!(error instanceof RangeError)) throw error;
+    formatter = new Intl.DateTimeFormat('en-CA', { timeZone: 'UTC', year: 'numeric', month: '2-digit', day: '2-digit' });
+  }
+  const parts = formatter.formatToParts(timestamp);
   const value = (type: string) => parts.find((part) => part.type === type)?.value ?? '';
   return `${value('year')}-${value('month')}-${value('day')}`;
 }

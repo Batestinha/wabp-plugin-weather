@@ -247,7 +247,7 @@ async function resolveQueryLocation(
     label: place.label,
     latitude: place.point.latitude,
     longitude: place.point.longitude,
-    timezone: 'auto'
+    timezone: place.timezone ?? 'UTC'
   };
 }
 
