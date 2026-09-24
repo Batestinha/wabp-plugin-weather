@@ -134,3 +134,62 @@ test('uses FCUL Cascais tides for the Sintra event location without an Open-Mete
   assert.deepEqual(result.eventsByDate.get('2026-09-26').map(event => event.height.value), [3.45, 0.83]);
   assert.equal(urls.some(url => url.includes('open-meteo')), false);
 });
+
+test('anchors an Open-Meteo fallback to a fresh nearby IH observation at the same station and time', async () => {
+  const { portugalTides } = require('../dist/tides.js');
+  const { parseWeatherConfig } = require('../dist/config.js');
+  const now = Math.floor(Date.now() / 900_000) * 900_000;
+  const sampleTimes = [-2, -1, 0, 1, 2].map(step => new Date(now + step * 900_000).toISOString().slice(0, 16));
+  const urls = [];
+  global.fetch = async url => {
+    const value = String(url);
+    urls.push(value);
+    if (value.includes('instances/l1/locations')) return { ok: true, json: async () => ({ features: [{
+      id: '152-303', geometry: { coordinates: [-9.16325, 38.700194] },
+      properties: { title: 'Lisboa - Alcântara', last_date_time: new Date(now).toISOString(), last_sea_surface_height: 2 }
+    }] }) };
+    if (value.includes('/marine')) return { ok: true, json: async () => ({
+      latitude: 38.700194, longitude: -9.16325,
+      minutely_15: { time: sampleTimes, sea_level_height_msl: [0, 0.5, 1, 0.5, 0] }
+    }) };
+    return { ok: false, text: async () => '' };
+  };
+  const result = await portugalTides({
+    config: parseWeatherConfig({}),
+    location: { label: 'Cascais/Sintra', latitude: 38.79846, longitude: -9.3881, timezone: 'Europe/Lisbon' },
+    forecastDays: 3
+  });
+  assert.equal(result.context.quality, 'crude-current-anchor');
+  assert.equal(result.context.station.id, '152-303');
+  assert.equal(result.context.adjustment.offset.value, 1);
+  assert.equal(result.context.adjustment.openMeteoHeight.value, 1);
+  assert.equal(result.context.adjustment.ihHeight.value, 2);
+  assert.ok(result.eventsByDate.size > 0);
+  assert.ok(urls.some(url => url.includes('latitude=38.700194') && url.includes('longitude=-9.16325')));
+});
+
+test('leaves an Open-Meteo fallback uncorrected when nearby IH readings are stale', async () => {
+  const { portugalTides } = require('../dist/tides.js');
+  const { parseWeatherConfig } = require('../dist/config.js');
+  const now = Math.floor(Date.now() / 900_000) * 900_000;
+  global.fetch = async url => {
+    const value = String(url);
+    if (value.includes('instances/l1/locations')) return { ok: true, json: async () => ({ features: [{
+      id: '152-303', geometry: { coordinates: [-9.16325, 38.700194] },
+      properties: { title: 'Lisboa - Alcântara', last_date_time: new Date(now - 86_400_000).toISOString(), last_sea_surface_height: 2 }
+    }] }) };
+    if (value.includes('/marine')) return { ok: true, json: async () => ({
+      latitude: 38.79846, longitude: -9.3881,
+      minutely_15: { time: [-1, 0, 1].map(step => new Date(now + step * 900_000).toISOString().slice(0, 16)), sea_level_height_msl: [0, 1, 0] }
+    }) };
+    return { ok: false, text: async () => '' };
+  };
+  const result = await portugalTides({
+    config: parseWeatherConfig({}),
+    location: { label: 'Cascais/Sintra', latitude: 38.79846, longitude: -9.3881, timezone: 'Europe/Lisbon' },
+    forecastDays: 3
+  });
+  assert.equal(result.context.quality, 'modelled');
+  assert.equal(result.context.adjustment, undefined);
+  assert.equal(result.context.station, undefined);
+});
