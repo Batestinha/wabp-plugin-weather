@@ -37,7 +37,7 @@ function marineForecastDayLines(
         tideContext.quality === 'crude-current-anchor'
           ? 'official.weather.tideTimes.sourceCrude'
           : tideContext.forecastSource === 'fcul'
-            ? 'official.weather.tideTimes.sourceFcul'
+            ? tideContext.observation ? 'official.weather.tideTimes.sourceFcul' : 'official.weather.tideTimes.sourceFculOnly'
             : 'official.weather.tideTimes.sourceMsl',
         {
           station: tideContext.station?.name ?? location,

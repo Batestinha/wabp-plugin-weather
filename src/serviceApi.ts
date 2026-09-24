@@ -81,6 +81,7 @@ export const weatherTideContextSchema = z.object({
   quality: z.enum(['calibrated-prediction', 'modelled', 'crude-current-anchor']),
   station: z.object({ id: z.string(), name: z.string(), distanceKm: z.number() }).strict().optional(),
   observation: z.object({ time: z.string(), height: weatherMetricValueSchema }).strict().optional(),
+  current: z.object({ time: z.string(), height: weatherMetricValueSchema, estimated: z.boolean() }).strict().optional(),
   calibration: z.object({ method: z.literal('fixed-station-offset'), offset: weatherMetricValueSchema }).strict().optional(),
   adjustment: z.object({
     at: z.string(),

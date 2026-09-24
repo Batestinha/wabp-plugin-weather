@@ -199,7 +199,7 @@ async function cached<T>(
   const key = `weather:${method}:${hash(input)}`;
   if (ttlSeconds > 0) {
     const cachedValue = await store.get<T>(key);
-    if (cachedValue) {
+    if (cachedValue && !hasExpiredTideObservation(cachedValue)) {
       return cachedValue;
     }
   }
@@ -208,6 +208,15 @@ async function cached<T>(
     await store.set(key, value, ttlSeconds);
   }
   return value;
+}
+
+function hasExpiredTideObservation(value: unknown): boolean {
+  const output = record(value);
+  const report = record(output.report);
+  const observation = record(record(report.tideContext).observation);
+  if (typeof observation.time !== 'string') return false;
+  const age = Date.now() - Date.parse(observation.time);
+  return !Number.isFinite(age) || age < 0 || age > 15 * 60_000;
 }
 
 function hash(input: unknown): string {

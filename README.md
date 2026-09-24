@@ -2,7 +2,7 @@
 
 Current weather, forecasts and marine conditions through `/weather`, a typed assistant tool and the `official.weather.v2` service.
 
-Standalone WABS package `official.weather` version `0.5.1`, requiring WABP core API `^0.3.0`. Portuguese tide locations near a configured station use fresh Instituto Hidrográfico observations and calibrated FCUL harmonic predictions. If FCUL is unavailable, the plugin clearly labels a crude fallback that applies the current IH/Open-Meteo difference to the Open-Meteo forecast. Other coastal locations keep Open-Meteo heights relative to mean sea level.
+Standalone WABS package `official.weather` version `0.5.1`, requiring WABP core API `^0.3.0`. All 20 ports in FCUL's published catalogue have calibrated harmonic forecasts. A recent Instituto Hidrográfico L1 observation supplies the current height where available; otherwise the current height is an FCUL estimate. If FCUL is unavailable, only a fresh IH observation may anchor a clearly labelled crude Open-Meteo fallback. Other Open-Meteo heights remain relative to mean sea level.
 
 The archive includes its runtime dependencies and Portuguese translations. Existing scope settings, metric selections, units, provider endpoints and enabled state retain their identifiers and values. WABP owns authorization and configuration resolution.
 
