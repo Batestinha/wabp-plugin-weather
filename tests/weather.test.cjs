@@ -22,6 +22,12 @@ function method(config = {}, services) {
   })[0].methods[0];
 }
 const call = { scopeId: 'fixture-scope', actorIdentityId: 'fixture-identity', groupId: 'fixture-group', groupWid: 'fixture@g.us' };
+/** The geocoder's resolve answer for one certain place. */
+function resolved(place, extra = {}) {
+  return { status: 'resolved', query: place.label, searchQuery: place.label, remembered: false, provider: 'fixture',
+    fetchedAt: '2026-09-12T12:00:00.000Z', candidates: [{ place, shortLabel: place.label, remembered: false, nameMatch: true }],
+    presentation: { optionLines: [`1. ${place.label}`] }, ...extra };
+}
 
 test('parses location names and rejects invalid forecast ranges', () => {
   assert.deepEqual(parseWeatherRequest('"São Pedro de Sintra" 0-5'), { ok: true, location: 'São Pedro de Sintra', selection: { startDay: 0, endDay: 5 } });
@@ -55,7 +61,7 @@ test('uses the geocoder service with the caller scope and normalizes mocked prov
   const abort = new AbortController();
   const services = { call: async input => {
     serviceCalls.push(input);
-    return { results: [{ label: 'Lisbon, Portugal', point: { latitude: 38.72, longitude: -9.14 }, timezone: 'Europe/Lisbon' }] };
+    return resolved({ label: 'Lisbon, Portugal', point: { latitude: 38.72, longitude: -9.14 }, timezone: 'Europe/Lisbon' });
   } };
   global.fetch = async (url, options) => {
     requests.push({ url: new URL(url), options });
@@ -68,6 +74,8 @@ test('uses the geocoder service with the caller scope and normalizes mocked prov
   assert.equal(output.report.current.temperature2m.value, 77);
   assert.equal(output.report.location.timezone, 'Europe/Lisbon');
   assert.equal(serviceCalls[0].serviceId, 'official.geocoder.v1');
+  assert.equal(serviceCalls[0].method, 'resolve');
+  assert.equal(serviceCalls[0].input.query, 'Lisbon');
   for (const key of ['scopeId', 'actorIdentityId', 'groupId', 'groupWid']) assert.equal(serviceCalls[0][key], call[key]);
   assert.equal(serviceCalls[0].signal, abort.signal);
   assert.equal(requests[0].options.signal, abort.signal);
@@ -82,12 +90,10 @@ test('includes tides for named locations and tolerates auto timezone service inp
   const year = new Date().getUTCFullYear();
   const forecastDate = `${year}-09-23`;
   const requests = [];
-  const services = { call: async () => ({
-    results: [{
-      label: 'Sesimbra, Setúbal, Portugal',
-      point: { latitude: 38.4436932, longitude: -9.0996273 },
-      timezone: 'Europe/Lisbon'
-    }]
+  const services = { call: async () => resolved({
+    label: 'Sesimbra, Setúbal, Portugal',
+    point: { latitude: 38.4436932, longitude: -9.0996273 },
+    timezone: 'Europe/Lisbon'
   }) };
   global.fetch = async input => {
     const url = new URL(input);

@@ -6,9 +6,9 @@ import type {
 } from '@wabs/plugin-sdk/services';
 import type { ServicePluginContext as PluginServiceRegistrationContext } from '@wabs/plugin-sdk/service-plugin';
 import {
-  GEOCODER_GEOCODE_METHOD,
+  GEOCODER_RESOLVE_METHOD,
   GEOCODER_SERVICE_ID,
-  type GeocodeOutput
+  type ResolveOutput
 } from './contracts/geocoder-v1';
 import { parseWeatherConfig, type WeatherConfig, type WeatherMetricFlags } from './config';
 import type { TranslateFn } from '@wabs/plugin-sdk/i18n';
@@ -65,9 +65,11 @@ export function registerWeatherServices(context: PluginServiceRegistrationContex
       inputSchema: weatherPresentInputSchema,
       outputSchema: weatherPresentOutputSchema,
       async handler(rawInput, call) {
-        const { style, ...input } = rawInput as WeatherPresentInput;
+        const { style, ...requested } = rawInput as WeatherPresentInput;
         const config = parseWeatherConfig(await context.configFor(call.scopeId, call.actorIdentityId));
         assertWeatherEnabled(config);
+        const resolvedLocation = await resolveQueryLocation(context, requested, call);
+        const input: WeatherQueryInput = { ...requested, location: resolvedLocation.location };
         const output = await runWeatherQuery(context, config, input, call);
         const todayMarine = output.kind === 'current' && input.includeMarine !== false
           ? await currentDayMarine(context, config, input, output.report.location, call)
@@ -75,7 +77,12 @@ export function registerWeatherServices(context: PluginServiceRegistrationContex
         const { t, locale } = await weatherTranslator(context, call.scopeId, input.language);
         return {
           output,
-          presentation: presentWeather(output, { t, locale, style: style ?? config.presentation.style }, todayMarine)
+          presentation: presentWeather(output, {
+            t,
+            locale,
+            style: style ?? config.presentation.style,
+            ...(resolvedLocation.alternatives ? { locationNote: resolvedLocation.alternatives } : {})
+          }, todayMarine)
         } satisfies WeatherPresentOutput;
       }
     }]
@@ -88,7 +95,7 @@ async function runWeatherQuery(
   input: WeatherQueryInput,
   call: PluginServiceCallContext
 ): Promise<WeatherQueryOutput> {
-  const location = await resolveQueryLocation(context, input, call);
+  const { location } = await resolveQueryLocation(context, input, call);
   const metrics = queryMetrics(config, input);
   return cached(context.ephemeralStore, config, 'query', {
     input: { ...input, location },
@@ -321,20 +328,27 @@ function hash(input: unknown): string {
   return createHash('sha256').update(JSON.stringify(input)).digest('hex').slice(0, 24);
 }
 
+interface ResolvedQueryLocation {
+  location: WeatherServiceLocation;
+  /** The geocoder's line naming other places with that name, when its pick is only the best guess. */
+  alternatives?: string | undefined;
+}
+
+/** Place names go through the geocoder's disambiguation: this community's places and area first. */
 async function resolveQueryLocation(
   context: PluginServiceRegistrationContext,
   input: WeatherQueryInput,
   call: PluginServiceCallContext
-): Promise<WeatherServiceLocation> {
+): Promise<ResolvedQueryLocation> {
   if (typeof input.location !== 'string') {
-    return input.location;
+    return { location: input.location };
   }
   if (!context.services) {
     throw new Error('Location lookup is unavailable.');
   }
-  const geocoded = await context.services.call<GeocodeOutput>({
+  const resolved = await context.services.call<ResolveOutput>({
     serviceId: GEOCODER_SERVICE_ID,
-    method: GEOCODER_GEOCODE_METHOD,
+    method: GEOCODER_RESOLVE_METHOD,
     scopeId: call.scopeId,
     ...(call.actorIdentityId ? { actorIdentityId: call.actorIdentityId } : {}),
     ...(call.groupId ? { groupId: call.groupId } : {}),
@@ -342,19 +356,24 @@ async function resolveQueryLocation(
     input: {
       query: input.location,
       ...(input.language ? { language: input.language } : {}),
-      limit: 1
+      limit: 5
     },
     ...(call.signal ? { signal: call.signal } : {})
   });
-  const place = geocoded.results[0];
-  if (!place) {
+  const place = resolved.candidates[0]?.place;
+  if (resolved.status === 'not_found' || !place) {
     throw new Error(`No location found for "${input.location}".`);
   }
   return {
-    label: place.label,
-    latitude: place.point.latitude,
-    longitude: place.point.longitude,
-    timezone: place.timezone ?? 'UTC'
+    location: {
+      label: place.label,
+      latitude: place.point.latitude,
+      longitude: place.point.longitude,
+      timezone: place.timezone ?? 'UTC'
+    },
+    ...(resolved.status === 'ambiguous' && resolved.presentation.alternatives
+      ? { alternatives: resolved.presentation.alternatives }
+      : {})
   };
 }
 
