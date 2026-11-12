@@ -67,6 +67,9 @@ test('renders a forecast day by day with emoji, rounded values, compass points a
   ].join('\n'));
   assert.deepEqual(presentation.days[0].condition, { code: 95, text: 'Trovoada', emoji: '⛈️' });
   assert.equal(presentation.days[0].label, 'sáb, 14 nov');
+  const wholeMetre = structuredClone(forecast);
+  wholeMetre.report.days[0].marine.tideEvents[0].height.value = 2.98;
+  assert.match(presentWeather(wholeMetre, { ...pt, style: 'emoji' }).days[0].marineText, /^🌊 ⬆️ 04h54 3,0 m · /);
   assert.equal(presentation.days[0].text, `${presentation.days[0].weatherText}\n${presentation.days[0].marineText}`);
 });
 

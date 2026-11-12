@@ -174,7 +174,7 @@ function marineDayLines(marine: MarineDay, context: WeatherPresentationContext):
       ? unavailableLine(context, EMOJI.waves, 'official.weather.label.waves')
       : part(context, EMOJI.waves, 'official.weather.label.waves', joinParts([
           marine.waveHeightMax
-            ? t('official.weather.value.upTo', { value: formatQuantity(marine.waveHeightMax, locale, 1) })
+            ? t('official.weather.value.upTo', { value: formatQuantity(marine.waveHeightMax, locale, 1, true) })
             : undefined,
           marine.waveDirectionDominant
             ? t('official.weather.value.from', { direction: compassPoint(marine.waveDirectionDominant.value, t) })
@@ -218,7 +218,7 @@ function tideLines(marine: MarineDay, context: WeatherPresentationContext): stri
   const { t, locale } = context;
   const events = marine.tideEvents.map((event) => {
     const time = formatClockTime(event.time, t);
-    const height = formatQuantity(event.height, locale, 1);
+    const height = formatQuantity(event.height, locale, 1, true);
     return context.style === 'emoji'
       ? `${event.type === 'high' ? EMOJI.tideHigh : EMOJI.tideLow} ${time} ${height}`
       : t(event.type === 'high' ? 'official.weather.value.tideHigh' : 'official.weather.value.tideLow', { time, height });

@@ -56,16 +56,17 @@ export function weatherConditionEmoji(kind: WeatherConditionKind, isDay = true):
   return CONDITION_EMOJI[kind];
 }
 
-export function formatNumber(value: number, locale: string, fractionDigits: number): string {
+/** Rounds to `fractionDigits`; `fixed` keeps trailing zeros so a column of heights lines up ("3,0 m" beside "2,7 m"). */
+export function formatNumber(value: number, locale: string, fractionDigits: number, fixed = false): string {
   const rounded = Number(value.toFixed(fractionDigits));
   return new Intl.NumberFormat(locale, {
-    minimumFractionDigits: 0,
+    minimumFractionDigits: fixed ? fractionDigits : 0,
     maximumFractionDigits: fractionDigits
   }).format(Object.is(rounded, -0) ? 0 : rounded);
 }
 
-export function formatQuantity(metric: WeatherMetricValue, locale: string, fractionDigits: number): string {
-  const value = formatNumber(metric.value, locale, fractionDigits);
+export function formatQuantity(metric: WeatherMetricValue, locale: string, fractionDigits: number, fixed = false): string {
+  const value = formatNumber(metric.value, locale, fractionDigits, fixed);
   return metric.unit ? `${value} ${metric.unit}` : value;
 }
 
