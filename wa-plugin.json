@@ -4,7 +4,7 @@
   "name": "Weather",
   "description": "Location-based current weather and forecasts.",
   "kind": "managed_group",
-  "version": "0.5.4",
+  "version": "0.6.0",
   "coreApiRange": "^0.3.0",
   "entrypoint": "dist/index.js",
   "messageNamespace": "official.weather",
@@ -62,6 +62,10 @@
         {
           "name": "query",
           "access": "read"
+        },
+        {
+          "name": "present",
+          "access": "read"
         }
       ]
     }
@@ -85,7 +89,8 @@
     "useCases": [
       "Show current weather for a named location.",
       "Show one forecast day or an inclusive forecast range up to 15 days ahead.",
-      "Expose the same normalized weather query used by /weather to other plugins and the natural-language assistant."
+      "Expose the same normalized weather query used by /weather to other plugins and the natural-language assistant.",
+      "Give other plugins the same weather message text /weather sends, through the present service method."
     ],
     "prerequisites": [
       "The plugin must be enabled for the target scope.",
@@ -106,6 +111,7 @@
       "enabled",
       "provider",
       "cacheTtlSeconds",
+      "presentation.style",
       "units.temperatureUnit",
       "units.windSpeedUnit",
       "units.precipitationUnit",
@@ -189,6 +195,44 @@
         "ui": {
           "helpText": "Seconds to cache provider responses in the plugin ephemeral store. Use 0 to disable caching.",
           "widget": "number"
+        },
+        "relatedCommandIds": [
+          "/weather"
+        ]
+      },
+      {
+        "id": "plugin.official.weather.presentation.style",
+        "path": "presentation.style",
+        "label": "Message style",
+        "description": "Emoji icons or plain text labels in weather messages from /weather, the assistant and Community Events.",
+        "section": "Weather",
+        "order": 40,
+        "schema": {
+          "type": "enum",
+          "enum": [
+            {
+              "value": "emoji",
+              "label": "Emoji"
+            },
+            {
+              "value": "plain",
+              "label": "Plain text"
+            }
+          ]
+        },
+        "ui": {
+          "helpText": "Emoji icons or plain text labels in weather messages from /weather, the assistant and Community Events.",
+          "widget": "segmented",
+          "options": [
+            {
+              "value": "emoji",
+              "label": "Emoji"
+            },
+            {
+              "value": "plain",
+              "label": "Plain text"
+            }
+          ]
         },
         "relatedCommandIds": [
           "/weather"

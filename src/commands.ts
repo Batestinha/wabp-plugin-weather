@@ -6,15 +6,13 @@ import type { PluginCommandContext } from '@wabs/plugin-sdk/command-plugin';
 import { requireStableIdentityAddress } from '@wabs/plugin-sdk/message-actor';
 import { requireScopeId } from '@wabs/plugin-sdk/commands';
 import { WEATHER_PLUGIN_ID } from './manifest';
-import { renderMarineForecast } from './marineForecast';
-import { renderWeatherQuery } from './presentation';
 import {
   WEATHER_MAX_DAY_OFFSET,
-  WEATHER_QUERY_METHOD,
+  WEATHER_PRESENT_METHOD,
   WEATHER_SERVICE_ID,
   type WeatherDaySelection,
-  type WeatherQueryInput,
-  type WeatherQueryOutput
+  type WeatherPresentInput,
+  type WeatherPresentOutput
 } from './serviceApi';
 
 type WeatherRequestParseResult =
@@ -40,15 +38,6 @@ export interface WeatherRequestContext {
 
 const DAY_SELECTOR_CANDIDATE_PATTERN = /^[\d-]+$/;
 const DAY_SELECTOR_PATTERN = /^(\d+)(?:-(\d+))?$/;
-const CURRENT_MARINE_SELECTION: WeatherDaySelection = { startDay: 0, endDay: 0 };
-const MARINE_ONLY_METRIC_OVERRIDES = {
-  temperature: false,
-  apparentTemperature: false,
-  relativeHumidity: false,
-  wind: false,
-  precipitation: false,
-  weatherCode: false
-} satisfies NonNullable<WeatherQueryInput['metrics']>;
 
 export function registerWeatherCommands(context: PluginCommandContext): void {
   context.router.register('weather', '*', weatherCommand(), async (ctx) => {
@@ -82,31 +71,27 @@ export async function executeWeatherRequest(
   request: WeatherRequest,
   target: WeatherRequestContext
 ): Promise<string> {
-  const output = await callWeatherQuery(context, target, {
+  const result = await callWeatherPresent(context, target, {
     location: request.location,
-    ...(request.selection ? { selection: request.selection, includeMarine: 'auto' as const } : { includeMarine: false }),
+    ...(request.selection ? { selection: request.selection } : {}),
+    includeMarine: 'auto',
     language: target.locale
   });
-  const marineText = output.kind === 'forecast'
-    ? renderMarineForecast(output.report, target.t, target.locale)
-    : await currentMarineForecastText(context, target, request.location);
-  return [
-    renderWeatherQuery(output, target.t, target.locale),
-    marineText
-  ].filter((line): line is string => Boolean(line?.trim())).join('\n\n');
+  return result.presentation.text;
 }
 
-async function callWeatherQuery(
+/** /weather and the assistant send the same text the `present` service gives other plugins. */
+async function callWeatherPresent(
   context: Pick<PluginCommandContext, 'services'>,
   target: WeatherRequestContext,
-  input: WeatherQueryInput
-): Promise<WeatherQueryOutput> {
+  input: WeatherPresentInput
+): Promise<WeatherPresentOutput> {
   if (!context.services) {
     throw new Error('Weather services are unavailable.');
   }
-  return context.services.call<WeatherQueryOutput>({
+  return context.services.call<WeatherPresentOutput>({
     serviceId: WEATHER_SERVICE_ID,
-    method: WEATHER_QUERY_METHOD,
+    method: WEATHER_PRESENT_METHOD,
     scopeId: target.scopeId,
     actorIdentityId: target.actorIdentityId,
     ...(target.groupId ? { groupId: target.groupId } : {}),
@@ -115,27 +100,6 @@ async function callWeatherQuery(
     input,
     ...(target.signal ? { signal: target.signal } : {})
   });
-}
-
-async function currentMarineForecastText(
-  context: Pick<PluginCommandContext, 'services'>,
-  target: WeatherRequestContext,
-  location: string
-): Promise<string | undefined> {
-  try {
-    const output = await callWeatherQuery(context, target, {
-      location,
-      selection: CURRENT_MARINE_SELECTION,
-      language: target.locale,
-      includeMarine: 'auto',
-      metrics: MARINE_ONLY_METRIC_OVERRIDES
-    });
-    return output.kind === 'forecast'
-      ? renderMarineForecast(output.report, target.t, target.locale)
-      : undefined;
-  } catch {
-    return undefined;
-  }
 }
 
 function weatherRequestContext(ctx: CommandContext): WeatherRequestContext {

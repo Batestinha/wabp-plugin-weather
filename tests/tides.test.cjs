@@ -2,7 +2,7 @@ const assert = require('node:assert/strict');
 const { test, afterEach } = require('node:test');
 const plugin = require('../dist/index.js').default;
 const { portugalTides } = require('../dist/tides.js');
-const { renderMarineForecast } = require('../dist/marineForecast.js');
+const { presentWeather } = require('../dist/presentation.js');
 const portuguese = require('../locales/pt-PT/official.weather.json');
 
 const originalFetch = global.fetch;
@@ -105,21 +105,25 @@ test('forecast-only ports use FCUL identifiers and no IH request', async () => {
   }
 });
 
-test('English and Portuguese source lines distinguish FCUL only, observed FCUL and crude fallback', () => {
-  const base = { location: { label: 'Sesimbra' }, days: [{ date: '2026-09-24', marine: {
-    requested: ['tide'], unavailable: [], tideEvents: []
-  } }] };
+test('English and Portuguese tide notes name the FCUL station, the crude IH anchor or the mean-sea-level model', () => {
+  const report = (tideContext) => ({ kind: 'forecast', selection: { startDay: 0, endDay: 0 }, report: {
+    location: { label: 'Sesimbra' }, tideContext,
+    days: [{ date: '2026-09-24', marine: { requested: ['tide'], unavailable: [], tideEvents: [
+      { type: 'high', time: '2026-09-24T05:00', height: { value: 2.5, unit: 'm' } }
+    ] } }]
+  } });
   const english = plugin.manifest.defaultMessages;
-  const translate = (messages) => (key, values) => (messages[key] ?? key).replace(/\{(\w+)\}/g, (_, name) => values?.[name] ?? '');
-  for (const [messages, expectedOnly, expectedFresh, expectedCrude] of [
-    [english, 'No recent IH observation', 'IH current', 'Crude IH-anchored'],
-    [portuguese, 'Sem observacao recente do IH', 'Nivel atual do IH', 'ancorada no IH']
+  const translate = (messages) => (key, values) => (messages[key] ?? english[key] ?? key).replace(/\{(\w+)\}/g, (_, name) => values?.[name] ?? '');
+  for (const [locale, messages, expectedFcul, expectedCrude, expectedMsl] of [
+    ['en-GB', english, 'calibrated FCUL forecast for Sesimbra, Portuguese chart datum', 'anchored to the IH gauge at Sesimbra', 'relative to mean sea level'],
+    ['pt-PT', portuguese, 'previsão FCUL calibrada para Sesimbra, zero hidrográfico', 'ancorada no marégrafo do IH em Sesimbra', 'relativas ao nível médio do mar']
   ]) {
-    const source = (tideContext) => renderMarineForecast({ ...base, tideContext }, translate(messages), 'en-GB');
-    const context = { forecastSource: 'fcul', station: { name: 'Sesimbra' } };
-    assert.ok(source(context).includes(expectedOnly));
-    assert.ok(source({ ...context, observation: { time: iso(), height: { value: 2.5, unit: 'm' } } }).includes(expectedFresh));
-    assert.ok(source({ ...context, forecastSource: 'open-meteo', quality: 'crude-current-anchor',
+    const note = (tideContext) => presentWeather(report(tideContext), { t: translate(messages), locale, style: 'emoji' }).footnote;
+    const fcul = { forecastSource: 'fcul', datum: 'zh-portugal', quality: 'calibrated-prediction', station: { id: 'x', name: 'Sesimbra', distanceKm: 1 } };
+    assert.ok(note(fcul).includes(expectedFcul));
+    assert.equal(note({ ...fcul, observation: { time: iso(), height: { value: 2.5, unit: 'm' } } }), note(fcul));
+    assert.ok(note({ ...fcul, forecastSource: 'open-meteo', quality: 'crude-current-anchor', datum: 'ih-anchored-approximate-zh',
       adjustment: { offset: { value: 2, unit: 'm' } } }).includes(expectedCrude));
+    assert.ok(note({ forecastSource: 'open-meteo', datum: 'mean-sea-level', quality: 'modelled' }).includes(expectedMsl));
   }
 });

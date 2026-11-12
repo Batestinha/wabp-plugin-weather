@@ -11,7 +11,11 @@ import {
   type GeocodeOutput
 } from './contracts/geocoder-v1';
 import { parseWeatherConfig, type WeatherConfig, type WeatherMetricFlags } from './config';
+import type { TranslateFn } from '@wabs/plugin-sdk/i18n';
+import { bundledTranslator } from './bundledMessages';
+import { presentWeather } from './presentation';
 import {
+  WEATHER_PRESENT_METHOD,
   WEATHER_QUERY_METHOD,
   WEATHER_SERVICE_ID,
   type WeatherCurrentOutput,
@@ -20,10 +24,14 @@ import {
   type WeatherMarineMode,
   type WeatherMarineMetricKey,
   type WeatherMetricValue,
+  type WeatherPresentInput,
+  type WeatherPresentOutput,
   type WeatherQueryInput,
   type WeatherQueryOutput,
   type WeatherServiceLocation,
   type WeatherTideEvent,
+  weatherPresentInputSchema,
+  weatherPresentOutputSchema,
   weatherQueryInputSchema,
   weatherQueryOutputSchema
 } from './serviceApi';
@@ -49,39 +57,129 @@ export function registerWeatherServices(context: PluginServiceRegistrationContex
         const input = rawInput as WeatherQueryInput;
         const config = parseWeatherConfig(await context.configFor(call.scopeId, call.actorIdentityId));
         assertWeatherEnabled(config);
-        const location = await resolveQueryLocation(context, input, call);
-        const metrics = queryMetrics(config, input);
-        return cached(context.ephemeralStore, config, 'query', {
-          input: { ...input, location },
-          metrics
-        }, async (): Promise<WeatherQueryOutput> => {
-          if (!input.selection) {
-            return {
-              kind: 'current',
-              report: await fetchCurrentWeather({
-                config,
-                location,
-                metrics,
-                signal: call.signal
-              })
-            };
-          }
-          return {
-            kind: 'forecast',
-            selection: input.selection,
-            report: await fetchWeatherForecast({
-              config,
-              location,
-              metrics,
-              selection: input.selection,
-              marineMode: input.includeMarine,
-              signal: call.signal
-            })
-          };
-        });
+        return runWeatherQuery(context, config, input, call);
+      }
+    }, {
+      name: WEATHER_PRESENT_METHOD,
+      access: 'read',
+      inputSchema: weatherPresentInputSchema,
+      outputSchema: weatherPresentOutputSchema,
+      async handler(rawInput, call) {
+        const { style, ...input } = rawInput as WeatherPresentInput;
+        const config = parseWeatherConfig(await context.configFor(call.scopeId, call.actorIdentityId));
+        assertWeatherEnabled(config);
+        const output = await runWeatherQuery(context, config, input, call);
+        const todayMarine = output.kind === 'current' && input.includeMarine !== false
+          ? await currentDayMarine(context, config, input, output.report.location, call)
+          : undefined;
+        const { t, locale } = await weatherTranslator(context, call.scopeId, input.language);
+        return {
+          output,
+          presentation: presentWeather(output, { t, locale, style: style ?? config.presentation.style }, todayMarine)
+        } satisfies WeatherPresentOutput;
       }
     }]
   }];
+}
+
+async function runWeatherQuery(
+  context: PluginServiceRegistrationContext,
+  config: WeatherConfig,
+  input: WeatherQueryInput,
+  call: PluginServiceCallContext
+): Promise<WeatherQueryOutput> {
+  const location = await resolveQueryLocation(context, input, call);
+  const metrics = queryMetrics(config, input);
+  return cached(context.ephemeralStore, config, 'query', {
+    input: { ...input, location },
+    metrics
+  }, async (): Promise<WeatherQueryOutput> => {
+    if (!input.selection) {
+      return {
+        kind: 'current',
+        report: await fetchCurrentWeather({
+          config,
+          location,
+          metrics,
+          signal: call.signal
+        })
+      };
+    }
+    return {
+      kind: 'forecast',
+      selection: input.selection,
+      report: await fetchWeatherForecast({
+        config,
+        location,
+        metrics,
+        selection: input.selection,
+        marineMode: input.includeMarine,
+        signal: call.signal
+      })
+    };
+  });
+}
+
+/** Today's tides and other marine values for a current-conditions message; omitted when unavailable. */
+async function currentDayMarine(
+  context: PluginServiceRegistrationContext,
+  config: WeatherConfig,
+  input: WeatherQueryInput,
+  location: WeatherServiceLocation,
+  call: PluginServiceCallContext
+): Promise<WeatherForecastOutput | undefined> {
+  try {
+    const output = await runWeatherQuery(context, config, {
+      location,
+      selection: { startDay: 0, endDay: 0 },
+      ...(input.language ? { language: input.language } : {}),
+      includeMarine: 'auto',
+      metrics: MARINE_ONLY_METRIC_OVERRIDES
+    }, call);
+    return output.kind === 'forecast' ? output.report : undefined;
+  } catch (error) {
+    if (call.signal?.aborted) throw error;
+    return undefined;
+  }
+}
+
+const MARINE_ONLY_METRIC_OVERRIDES = {
+  temperature: false,
+  apparentTemperature: false,
+  relativeHumidity: false,
+  wind: false,
+  precipitation: false,
+  weatherCode: false
+} satisfies NonNullable<WeatherQueryInput['metrics']>;
+
+type RuntimeI18n = {
+  translator(locale: string, scopes?: unknown): TranslateFn;
+  resolveScopeLocale?(scopeId: string): Promise<{ locale: string; languagePackScopes?: unknown }>;
+};
+
+/**
+ * Plugin services receive the platform i18n service at runtime (scope language
+ * packs included), though the SDK context type does not declare it yet; fall
+ * back to the catalogs shipped in this package.
+ */
+async function weatherTranslator(
+  context: PluginServiceRegistrationContext,
+  scopeId: string,
+  language: string | undefined
+): Promise<{ t: TranslateFn; locale: string }> {
+  const i18n = (context as { i18n?: RuntimeI18n }).i18n;
+  if (i18n && typeof i18n.translator === 'function') {
+    let scopeLocale: { locale: string; languagePackScopes?: unknown } | undefined;
+    try {
+      scopeLocale = await i18n.resolveScopeLocale?.(scopeId);
+    } catch {
+      scopeLocale = undefined;
+    }
+    const locale = language ?? scopeLocale?.locale ?? 'en';
+    return { t: i18n.translator(locale, scopeLocale?.languagePackScopes), locale };
+  }
+  const locale = language ?? 'en';
+  return { t: bundledTranslator(locale), locale };
 }
 
 function assertWeatherEnabled(config: WeatherConfig): void {
@@ -287,7 +385,7 @@ function currentForecastVariables(metrics: WeatherMetricFlags): string[] {
     ...(metrics.apparentTemperature ? ['apparent_temperature'] : []),
     ...(metrics.relativeHumidity ? ['relative_humidity_2m'] : []),
     ...(metrics.precipitation ? ['precipitation'] : []),
-    ...(metrics.weatherCode ? ['weather_code'] : []),
+    ...(metrics.weatherCode ? ['weather_code', 'is_day'] : []),
     ...(metrics.wind ? ['wind_speed_10m', 'wind_direction_10m', 'wind_gusts_10m'] : [])
   ];
 }
@@ -439,7 +537,8 @@ function currentConditions(response: JsonRecord): WeatherCurrentOutput['current'
     ...numberField(current, 'weather_code', 'weatherCode'),
     ...metric(current, units, 'wind_speed_10m', 'windSpeed10m'),
     ...metric(current, units, 'wind_direction_10m', 'windDirection10m'),
-    ...metric(current, units, 'wind_gusts_10m', 'windGusts10m')
+    ...metric(current, units, 'wind_gusts_10m', 'windGusts10m'),
+    ...(current.is_day === 0 || current.is_day === 1 ? { isDay: current.is_day === 1 } : {})
   };
 }
 
