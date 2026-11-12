@@ -2,6 +2,7 @@ import type { PluginManifest } from '@wabs/plugin-sdk/manifest';
 import { weatherConfigSchema } from './config';
 import { weatherMessages } from './messages';
 import {
+  WEATHER_PRESENT_METHOD,
   WEATHER_QUERY_METHOD,
   WEATHER_SERVICE_ID
 } from './serviceApi';
@@ -11,7 +12,7 @@ export const WEATHER_PLUGIN_ID = 'official.weather';
 export const weatherManifest: PluginManifest = {
   pluginId: WEATHER_PLUGIN_ID,
   kind: 'managed_group',
-  version: '0.5.4',
+  version: '0.6.0',
   coreApiRange: '^0.3.0',
   messageNamespace: 'official.weather',
   descriptionKey: 'official.weather.description',
@@ -41,6 +42,9 @@ export const weatherManifest: PluginManifest = {
     methods: [{
       name: WEATHER_QUERY_METHOD,
       access: 'read'
+    }, {
+      name: WEATHER_PRESENT_METHOD,
+      access: 'read'
     }]
   }],
   requiredPermissions: [],
@@ -57,7 +61,8 @@ export const weatherManifest: PluginManifest = {
     useCases: [
       'Show current weather for a named location.',
       'Show one forecast day or an inclusive forecast range up to 15 days ahead.',
-      'Expose the same normalized weather query used by /weather to other plugins and the natural-language assistant.'
+      'Expose the same normalized weather query used by /weather to other plugins and the natural-language assistant.',
+      'Give other plugins the same weather message text /weather sends, through the present service method.'
     ],
     prerequisites: [
       'The plugin must be enabled for the target scope.',

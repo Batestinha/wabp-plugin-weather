@@ -45,6 +45,10 @@ const WIND_UNIT_OPTIONS = [
   { value: 'ms', label: 'm/s' },
   { value: 'kn', label: 'knots' }
 ];
+const PRESENTATION_STYLE_OPTIONS = [
+  { value: 'emoji', label: 'Emoji' },
+  { value: 'plain', label: 'Plain text' }
+];
 const PRECIPITATION_UNIT_OPTIONS = [
   { value: 'mm', label: 'mm' },
   { value: 'inch', label: 'inch' }
@@ -62,6 +66,10 @@ export const weatherControls: ControlDescriptor[] = [
     min: 0,
     max: 3600
   }, { widget: 'number' }),
+  control('presentation.style', 'Message style', 'Emoji icons or plain text labels in weather messages from /weather, the assistant and Community Events.', 40, {
+    type: 'enum',
+    enum: PRESENTATION_STYLE_OPTIONS
+  }, { widget: 'segmented', options: PRESENTATION_STYLE_OPTIONS }),
   control('units.temperatureUnit', 'Temperature unit', 'Temperature unit for current and forecast weather.', 200, {
     type: 'enum',
     enum: TEMPERATURE_UNIT_OPTIONS

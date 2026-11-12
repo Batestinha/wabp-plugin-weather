@@ -183,7 +183,9 @@ test('ships complete Portuguese catalogs, matching controls and immutable upstre
   const metadata = JSON.parse(fs.readFileSync('wa-plugin.json'));
   const pt = JSON.parse(fs.readFileSync('locales/pt-PT/official.weather.json'));
   for (const key of Object.keys(plugin.manifest.defaultMessages)) assert.ok(pt[key]?.trim(), key);
-  assert.equal(metadata.operatorConsole.controls.length, 20);
+  assert.equal(metadata.operatorConsole.controls.length, 21);
+  assert.deepEqual(metadata.services[0].methods.map(item => item.name), plugin.manifest.services[0].methods.map(item => item.name));
+  assert.equal(metadata.version, plugin.manifest.version);
   assert.equal(metadata.pluginId, plugin.manifest.pluginId);
   const contracts = JSON.parse(fs.readFileSync('contracts/provenance.json'));
   for (const item of contracts.contracts) {

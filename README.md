@@ -2,7 +2,9 @@
 
 Current weather, forecasts and marine conditions through `/weather`, a typed assistant tool and the `official.weather.v2` service.
 
-Standalone WABS package `official.weather` version `0.5.4`, requiring WABP core API `^0.3.0`. All 20 ports in FCUL's published catalogue have calibrated harmonic forecasts. A recent Instituto Hidrográfico L1 observation supplies the current height where available; otherwise the current height is an FCUL estimate. If FCUL is unavailable, only a fresh IH observation may anchor a clearly labelled crude Open-Meteo fallback. Other Open-Meteo heights remain relative to mean sea level.
+The service has two read methods. `query` returns the normalized data. `present` returns the same data plus the chat text that `/weather` and the assistant send, rendered in the caller's language: one block per day (conditions, temperature and humidity, rain, wind, then tides) and one note naming the tide source and datum. Other plugins, such as Community Events, send that text, so a forecast reads the same everywhere. The `presentation.style` setting chooses emoji icons (the default) or plain text labels.
+
+Standalone WABS package `official.weather` version `0.6.0`, requiring WABP core API `^0.3.0`. All 20 ports in FCUL's published catalogue have calibrated harmonic forecasts. A recent Instituto Hidrográfico L1 observation supplies the current height where available; otherwise the current height is an FCUL estimate. If FCUL is unavailable, only a fresh IH observation may anchor a clearly labelled crude Open-Meteo fallback. Other Open-Meteo heights remain relative to mean sea level.
 
 The archive includes its runtime dependencies and Portuguese translations. Existing scope settings, metric selections, units, provider endpoints and enabled state retain their identifiers and values. WABP owns authorization and configuration resolution.
 

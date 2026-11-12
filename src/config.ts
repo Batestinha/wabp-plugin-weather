@@ -4,6 +4,7 @@ export const WEATHER_PROVIDERS = ['open-meteo'] as const;
 export const WEATHER_TEMPERATURE_UNITS = ['celsius', 'fahrenheit'] as const;
 export const WEATHER_WIND_SPEED_UNITS = ['kmh', 'mph', 'ms', 'kn'] as const;
 export const WEATHER_PRECIPITATION_UNITS = ['mm', 'inch'] as const;
+export const WEATHER_PRESENTATION_STYLES = ['emoji', 'plain'] as const;
 
 export const weatherUnitsSchema = z.object({
   temperatureUnit: z.enum(WEATHER_TEMPERATURE_UNITS).default('celsius'),
@@ -37,18 +38,24 @@ export const weatherProviderSettingsSchema = z.object({
   }).default({})
 }).default({});
 
+export const weatherPresentationSettingsSchema = z.object({
+  style: z.enum(WEATHER_PRESENTATION_STYLES).default('emoji')
+}).default({});
+
 export const weatherConfigSchema = z.object({
   enabled: z.boolean().default(true),
   provider: z.enum(WEATHER_PROVIDERS).default('open-meteo'),
   cacheTtlSeconds: z.number().int().min(0).max(3600).default(600),
   units: weatherUnitsSchema,
   metrics: weatherMetricFlagsSchema,
+  presentation: weatherPresentationSettingsSchema,
   providerSettings: weatherProviderSettingsSchema
 }).default({});
 
 export type WeatherConfig = z.infer<typeof weatherConfigSchema>;
 export type WeatherUnits = z.infer<typeof weatherUnitsSchema>;
 export type WeatherMetricFlags = z.infer<typeof weatherMetricFlagsSchema>;
+export type WeatherPresentationStyle = typeof WEATHER_PRESENTATION_STYLES[number];
 
 export function parseWeatherConfig(input: unknown): WeatherConfig {
   return weatherConfigSchema.parse(input);
