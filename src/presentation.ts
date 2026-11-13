@@ -30,6 +30,8 @@ export interface WeatherPresentationContext {
   t: TranslateFn;
   locale: string;
   style: WeatherPresentationStyle;
+  /** The geocoder's line naming other places with the same name, shown under the title. */
+  locationNote?: string | undefined;
 }
 
 type ForecastDay = WeatherForecastOutput['days'][number];
@@ -92,7 +94,7 @@ function presentCurrent(
     marineDay && hasTideEvents(marineDay) ? tideFootnote(todayMarine?.tideContext, context) : undefined
   ]).join('\n') || undefined;
   const body = joinLines([weatherText, marineText]);
-  const title = t('official.weather.title.current', { location: report.location.label });
+  const title = withLocationNote(t('official.weather.title.current', { location: report.location.label }), context);
   return {
     locale: context.locale,
     style: context.style,
@@ -114,7 +116,7 @@ function presentForecast(report: WeatherForecastOutput, context: WeatherPresenta
   const days = report.days.map((day) => presentForecastDay(day, context));
   const tidesShown = report.days.some((day) => day.marine && hasTideEvents(day.marine));
   const footnote = tidesShown ? tideFootnote(report.tideContext, context) : undefined;
-  const title = t('official.weather.title.forecast', { location: report.location.label });
+  const title = withLocationNote(t('official.weather.title.forecast', { location: report.location.label }), context);
   const sections = days.map((day) => joinLines([t('official.weather.day.heading', { date: day.label }), day.text]));
   return {
     locale: context.locale,
@@ -330,6 +332,10 @@ function quantity(
   fractionDigits: number
 ): string | undefined {
   return metric ? formatQuantity(metric, context.locale, fractionDigits) : undefined;
+}
+
+function withLocationNote(title: string, context: WeatherPresentationContext): string {
+  return context.locationNote ? `${title}\n${italic(context.locationNote)}` : title;
 }
 
 function italic(value: string): string {

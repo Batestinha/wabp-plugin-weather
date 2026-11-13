@@ -211,3 +211,26 @@ test('/weather and the assistant send the present method text', async () => {
     assert.deepEqual(item.input, { location: 'Sesimbra', selection: { startDay: 1, endDay: 2 }, includeMarine: 'auto', language: 'pt-PT' });
   }
 });
+
+test('an ambiguous place name uses the best guess and names the other places under the title', async () => {
+  const forecastDate = new Date().toISOString().slice(0, 10);
+  mockSesimbraFetch(forecastDate);
+  const lagos = { label: 'Lagos, Faro, Portugal', point: { latitude: 37.1028, longitude: -8.673 }, timezone: 'Europe/Lisbon',
+    address: {}, attribution: { text: 'fixture', url: 'https://example.test' } };
+  const calls = [];
+  const services = { call: async input => {
+    calls.push(input);
+    return { status: 'ambiguous', query: 'Lagos', searchQuery: 'Lagos', remembered: false, provider: 'fixture', fetchedAt: new Date().toISOString(),
+      candidates: [{ place: lagos, shortLabel: 'Lagos, Faro, Portugal', remembered: false, nameMatch: true }],
+      presentation: { optionLines: ['1. Lagos, Faro, Portugal'], alternatives: 'Também encontrei: Lagos, Lagos State, Nigeria. Indica a região ou o país para escolher outro.' } };
+  } };
+  const result = await presentMethod({ cacheTtlSeconds: 0, metrics: { tide: false } }, { services })
+    .handler({ location: 'Lagos', selection: { startDay: 0, endDay: 0 }, includeMarine: 'auto', language: 'pt-PT' }, { scopeId: 'fixture-scope', actorIdentityId: 'fixture-identity' });
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].method, 'resolve');
+  assert.deepEqual(result.presentation.text.split('\n').slice(0, 2), [
+    '*Lagos, Faro, Portugal* · previsão',
+    '_Também encontrei: Lagos, Lagos State, Nigeria. Indica a região ou o país para escolher outro._'
+  ]);
+  assert.equal(result.output.report.location.label, 'Lagos, Faro, Portugal');
+});
