@@ -139,7 +139,7 @@ function presentMethod(config, extraContext = {}) {
   return methods.find(method => method.name === 'present');
 }
 
-function mockSesimbraFetch(forecastDate) {
+function mockSesimbraFetch(forecastDate, stationFile = 'Sesimbra') {
   global.fetch = async input => {
     const url = new URL(input);
     if (url.hostname === 'api.open-meteo.com') {
@@ -149,7 +149,7 @@ function mockSesimbraFetch(forecastDate) {
       }) };
     }
     if (url.hostname === 'webpages.ciencias.ulisboa.pt') {
-      return { ok: true, text: async () => url.pathname.endsWith(`Sesimbra${forecastDate.slice(0, 4)}.TXT`)
+      return { ok: true, text: async () => url.pathname.endsWith(`${stationFile}${forecastDate.slice(0, 4)}.TXT`)
         ? `${forecastDate} 05:38 1.63 Baixa-Mar\n${forecastDate} 11:48 2.98 Preia-Mar\n`
         : '' };
     }
@@ -157,6 +157,23 @@ function mockSesimbraFetch(forecastDate) {
     throw new Error(`Unexpected request: ${url}`);
   };
 }
+
+test('named Sintra and the saved event coordinates present the same FCUL Cascais tides', async () => {
+  const forecastDate = new Date().toISOString().slice(0, 10);
+  mockSesimbraFetch(forecastDate, 'CascaisFCUL');
+  const municipality = { label: 'Sintra, Lisboa, Portugal', point: { latitude: 38.8355446, longitude: -9.3522371 }, timezone: 'Europe/Lisbon' };
+  const services = { call: async () => ({ status: 'resolved', candidates: [{ place: municipality }], presentation: {} }) };
+  const handler = presentMethod({ cacheTtlSeconds: 0, metrics: { tide: true } }, { services }).handler;
+  const input = { selection: { startDay: 0, endDay: 0 }, includeMarine: 'auto', language: 'pt-PT' };
+  const call = { scopeId: 'fixture-scope', actorIdentityId: 'fixture-identity' };
+  const command = await handler({ ...input, location: 'Sintra' }, call);
+  const event = await handler({ ...input, location: { label: 'Sintra event', latitude: 38.79846, longitude: -9.3881, timezone: 'Europe/Lisbon' } }, call);
+  assert.equal(command.output.report.tideContext.forecastSource, 'fcul');
+  assert.equal(command.output.report.tideContext.station.name, 'Cascais');
+  assert.equal(command.presentation.days[0].marineText, event.presentation.days[0].marineText);
+  assert.equal(command.presentation.footnote, event.presentation.footnote);
+  assert.match(command.presentation.footnote, /FCUL calibrada para Cascais/);
+});
 
 test('the present service method returns the query data with the shared text, in the configured style', async () => {
   const forecastDate = new Date().toISOString().slice(0, 10);

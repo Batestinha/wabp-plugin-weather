@@ -13,5 +13,8 @@ const pt = JSON.parse(fs.readFileSync(path.join(root, 'locales/pt-PT/official.we
 for (const key of Object.keys(plugin.manifest.defaultMessages)) assert.ok(pt[key]?.trim(), key);
 for (const file of ['node_modules/@wabs/plugin-sdk/dist/command-plugin.js', 'node_modules/@wabs/plugin-sdk/LICENSE', 'node_modules/zod/LICENSE', 'contracts/provenance.json', 'contracts/LICENSE.geocoder']) assert.ok(fs.statSync(path.join(root, file)).isFile());
 assert.equal(fs.existsSync(path.join(root, 'node_modules/geo-tz')), false);
+const { portugueseTideLocation } = require(path.join(root, 'dist/portugalGeography.js'));
+assert.deepEqual(portugueseTideLocation(38.8355446, -9.3522371), { region: 'mainland', coastal: true });
+assert.equal(portugueseTideLocation(37.213, -7.405), undefined);
 assert.equal(plugin.manifest.configSchema.parse({ units: { temperatureUnit: 'fahrenheit' } }).units.temperatureUnit, 'fahrenheit');
 console.log(JSON.stringify({ pluginId: metadata.pluginId, version: metadata.version, standaloneLoad: true, translations: Object.keys(pt).length, controls: metadata.operatorConsole.controls.length }));
