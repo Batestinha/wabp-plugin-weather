@@ -247,6 +247,7 @@ async function fetchWeatherForecast(input: {
         config: input.config,
         location: input.location,
         forecastDays: days,
+        dates: forecast.slice(input.selection.startDay, input.selection.endDay + 1).map((day) => day.date),
         signal: input.signal
       });
     } catch {
@@ -301,7 +302,8 @@ async function cached<T>(
   produce: () => Promise<T>
 ): Promise<T> {
   const ttlSeconds = config.cacheTtlSeconds;
-  const key = `weather:${method}:${hash(input)}`;
+  // Do not reuse forecasts cached under the old station-radius routing policy.
+  const key = `weather:3:${method}:${hash(input)}`;
   if (ttlSeconds > 0) {
     const cachedValue = await store.get<T>(key);
     if (cachedValue && !hasExpiredTideObservation(cachedValue)) {

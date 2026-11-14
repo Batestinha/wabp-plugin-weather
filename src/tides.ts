@@ -1,5 +1,6 @@
 import type { WeatherConfig } from './config';
 import type { WeatherServiceLocation, WeatherTideContext, WeatherTideEvent } from './serviceApi';
+import { portugueseRegion, portugueseTideLocation, type PortugueseTideRegion } from './portugalGeography';
 
 type JsonRecord = Record<string, unknown>;
 type Profile = {
@@ -40,34 +41,51 @@ export async function portugalTides(input: {
   config: WeatherConfig;
   location: WeatherServiceLocation;
   forecastDays: number;
+  /** Dates actually requested by the caller, so stale or partial FCUL tables trigger fallback. */
+  dates?: readonly string[] | undefined;
   signal?: AbortSignal | undefined;
 }): Promise<TideResult> {
-  const profile = nearestProfile(input.location.latitude, input.location.longitude);
+  input.signal?.throwIfAborted();
+  // Published gauge coordinates take precedence over the generalized map at port quays.
+  const knownPort = PROFILES.find((port) => distanceKm(input.location.latitude, input.location.longitude, port.latitude, port.longitude) <= 0.25);
+  const portugueseLocation = knownPort
+    ? { region: portugueseRegion(knownPort.latitude, knownPort.longitude), coastal: true }
+    : portugueseTideLocation(input.location.latitude, input.location.longitude);
+  const profile = portugueseLocation
+    ? nearestProfile(input.location.latitude, input.location.longitude, portugueseLocation.region)
+    : undefined;
+  const stationDistance = profile ? distanceKm(input.location.latitude, input.location.longitude, profile.latitude, profile.longitude) : undefined;
+  // Keep the existing local-gauge limit for observations and datum anchoring, not FCUL coverage.
+  const localObservation = profile && stationDistance! <= profile.radiusKm && profile.ids.length > 0;
+  // A slow upstream must leave time for the Open-Meteo fallback. Caller cancellation still propagates.
+  const providerSignal = AbortSignal.any([AbortSignal.timeout(5_000), ...(input.signal ? [input.signal] : [])]);
   const [observation, fcul] = await Promise.all([
-    profile?.ids.length ? fetchObservation(input.config, profile, input.signal).catch((error) => {
+    localObservation ? fetchObservation(input.config, profile, providerSignal).catch((error) => {
       if (input.signal?.aborted) throw error;
       return undefined;
     }) : undefined,
-    profile ? fetchFcul(input.config, profile, input.signal).catch((error) => {
+    profile ? fetchFcul(input.config, profile, providerSignal).catch((error) => {
       if (input.signal?.aborted) throw error;
       return undefined;
     }) : undefined
   ]);
+  input.signal?.throwIfAborted();
   const station = profile ? {
     id: observation?.stationId ?? `fcul:${profile.file.slice(0, profile.file.indexOf('%d')).replace(/FCUL$/, '').toLowerCase()}`,
     name: profile.name,
-    distanceKm: distanceKm(input.location.latitude, input.location.longitude, profile.latitude, profile.longitude)
+    distanceKm: stationDistance!
   } : undefined;
   const observationContext = observation ? {
     time: observation.time,
     height: { value: observation.height, unit: 'm' }
   } : undefined;
 
-  if (profile && fcul && fcul.length > 0) {
+  const fculByDate = fcul ? groupEvents(fcul, input.location.timezone) : undefined;
+  if (profile && fcul && fcul.length > 0 && input.dates?.every((date) => fculByDate!.has(date)) !== false) {
     const currentHeight = observation?.height ?? interpolateFcul(fcul, Date.now());
     return {
-      coastal: true,
-      eventsByDate: groupEvents(fcul, input.location.timezone),
+      coastal: portugueseLocation!.coastal,
+      eventsByDate: fculByDate!,
       context: {
         forecastSource: 'fcul', datum: 'zh-portugal', quality: 'calibrated-prediction',
         ...(station ? { station } : {}),
@@ -82,7 +100,8 @@ export async function portugalTides(input: {
   }
 
   const openMeteo = await fetchOpenMeteo(input.config, input.location, input.forecastDays, input.signal);
-  const coastal = distanceKm(input.location.latitude, input.location.longitude, openMeteo.latitude, openMeteo.longitude) <= 35;
+  const coastal = portugueseLocation?.coastal ??
+    distanceKm(input.location.latitude, input.location.longitude, openMeteo.latitude, openMeteo.longitude) <= 35;
 
   let offset = 0;
   let adjustment: WeatherTideContext['adjustment'];
@@ -183,8 +202,14 @@ async function fetchFcul(config: WeatherConfig, profile: Profile, signal?: Abort
   const base = ensureSlash(config.providerSettings.tides.fculBaseUrl);
   const year = new Date().getUTCFullYear();
   const texts = await Promise.all([year - 1, year, year + 1].map(async (item) => {
-    const response = await fetch(base + profile.file.replace('%d', String(item)), signal ? { signal } : undefined);
-    return response.ok ? response.text() : '';
+    try {
+      const response = await fetch(base + profile.file.replace('%d', String(item)), signal ? { signal } : undefined);
+      return response.ok ? await response.text() : '';
+    } catch {
+      // Keep any completed year even if an optional adjacent year reaches the provider deadline.
+      // The caller's cancellation is checked after both providers settle.
+      return '';
+    }
   }));
   const events: WeatherTideEvent[] = [];
   const pattern = /^(\d{4}-\d{2}-\d{2})\s+(\d{1,2}:\d{2})\s+(-?\d+(?:\.\d+)?)\s+(Preia-Mar|Baixa-Mar)/gm;
@@ -264,9 +289,10 @@ function interpolate(samples: { time: number; height: number }[], timestamp: num
   return undefined;
 }
 
-function nearestProfile(latitude: number, longitude: number) {
-  return PROFILES.map((profile) => ({ profile, distance: distanceKm(latitude, longitude, profile.latitude, profile.longitude) }))
-    .filter((item) => item.distance <= item.profile.radiusKm).sort((a, b) => a.distance - b.distance)[0]?.profile;
+function nearestProfile(latitude: number, longitude: number, region: PortugueseTideRegion) {
+  return PROFILES.filter((profile) => portugueseRegion(profile.latitude, profile.longitude) === region)
+    .map((profile) => ({ profile, distance: distanceKm(latitude, longitude, profile.latitude, profile.longitude) }))
+    .sort((a, b) => a.distance - b.distance)[0]?.profile;
 }
 function distanceKm(a: number, b: number, c: number, d: number) { const r = (x: number) => x * Math.PI / 180; const x = Math.sin(r(c - a) / 2) ** 2 + Math.cos(r(a)) * Math.cos(r(c)) * Math.sin(r(d - b) / 2) ** 2; return 6371.0088 * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x)); }
 function ensureSlash(value: string) { return value.endsWith('/') ? value : `${value}/`; }
