@@ -19,3 +19,13 @@ Install through a trusted WABS registry entry. Installation and scope enablement
 For development, run `npm ci --ignore-scripts`, `npm test`, then `npm run release:archive`. Tests use fixture identities, mocked host capabilities and mocked HTTP. CI checks Node22.23.2 and24.15.0, reproducibility, and execution outside the repository with packaged dependencies.
 
 `provenance.json` records imported source history and the exact SDK input. No host implementation or credentials are included.
+
+## Command interaction contract
+
+This release requires WABP core API 0.4 and the matching plugin SDK. Commands
+declare invocation eligibility and the audience and length of their conversation
+through `interactionPolicy`; plugins without commands retain an empty command
+list. The host owns group-to-PM notices, the two-question allowance for brief
+clarification, and routing across assistant execution and recovered flows. Personal
+guided workflows stay private, with domain publications delivered through their
+existing authorized group publication paths.

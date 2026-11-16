@@ -1,4 +1,4 @@
-import type { CommandMetadata } from '@wabs/plugin-sdk/command-metadata';
+import type { PluginCommandMetadata, CommandMetadata } from '@wabs/plugin-sdk/command-metadata';
 import type { CommandContext } from '@wabs/plugin-sdk/commands';
 import { tokenizeArgs } from '@wabs/plugin-sdk/command-parser';
 import type { TranslateFn } from '@wabs/plugin-sdk/i18n';
@@ -161,10 +161,12 @@ export function parseDaySelection(value: string): WeatherDaySelection | undefine
   return { startDay, endDay };
 }
 
-function weatherCommand(): CommandMetadata {
+function weatherCommand(): PluginCommandMetadata {
   return {
+    interactionPolicy: { kind: 'brief', conversationAudience: 'requester', resultAudience: 'invoking_chat' },
     plane: 'group_operation',
     interaction: 'group_same_chat',
+    invocation: 'group_only',
     pluginId: WEATHER_PLUGIN_ID,
     requiredAccessPlane: 'group_member',
     requiresManagedGroup: true,
