@@ -1,6 +1,6 @@
 {
   "name": "@wabs/plugin-weather",
-  "version": "0.6.2",
+  "version": "0.7.0",
   "description": "Location-based current weather and forecasts.",
   "license": "MIT",
   "private": true,
@@ -32,7 +32,7 @@
     "node": ">=22"
   },
   "dependencies": {
-    "@wabs/plugin-sdk": "file:vendor/wabs-plugin-sdk-0.3.2-6e73ae5d45ff.tgz",
+    "@wabs/plugin-sdk": "file:vendor/wabs-plugin-sdk-0.4.0-6ba1145ff173.tgz",
     "zod": "3.25.76"
   },
   "devDependencies": {
