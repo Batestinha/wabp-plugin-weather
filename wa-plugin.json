@@ -1,10 +1,14 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "pluginId": "official.weather",
   "name": "Weather",
+  "author": {
+    "name": "Batestinha",
+    "url": "https://github.com/Batestinha"
+  },
   "description": "Location-based current weather and forecasts.",
   "kind": "managed_group",
-  "version": "0.6.2",
+  "version": "0.6.3",
   "coreApiRange": "^0.3.0",
   "entrypoint": "dist/index.js",
   "messageNamespace": "official.weather",
