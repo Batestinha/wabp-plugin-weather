@@ -1,11 +1,11 @@
 import type { MessageCatalog } from '@wabs/plugin-sdk/i18n';
 
 export const weatherMessages: MessageCatalog = {
-  'official.weather.description': 'Location-based current weather and forecasts.',
+  'official.weather.description': 'Shows current weather and forecasts by location with /weather. It also provides marine conditions and tide information for supported Portuguese stations to members and other plugins.',
   'official.weather.help.family': 'Weather',
   'official.weather.help.command': 'Show current weather or a selected forecast for a named location.',
   'official.weather.help.feature.title': 'Weather',
-  'official.weather.help.feature.summary': 'Look up current conditions, forecasts, and configured marine metrics by location.',
+  'official.weather.help.feature.summary': 'Look up the weather for a place, including marine conditions and tides where available.',
   'official.weather.help.forecast.title': 'Weather and forecasts',
   'official.weather.help.forecast.summary': 'Show current weather, one forecast day, or an inclusive day range.',
   'official.weather.help.forecast.instruction': 'Use day 0 for today, 1 for tomorrow, or a range such as 0-5; forecasts support up to 15 days.',
