@@ -1,9 +1,9 @@
 {
-  "official.weather.description": "Meteorologia atual e previsões por localização.",
+  "official.weather.description": "Mostra as condições meteorológicas atuais e a previsão por local com /weather. Também disponibiliza condições marítimas e informações sobre marés nas estações portuguesas abrangidas, tanto a membros como a outros plugins.",
   "official.weather.help.family": "Meteorologia",
   "official.weather.help.command": "Mostrar a meteorologia atual ou uma previsão selecionada para uma localização.",
   "official.weather.help.feature.title": "Meteorologia",
-  "official.weather.help.feature.summary": "Consulta condições atuais, previsões e métricas marítimas configuradas por local.",
+  "official.weather.help.feature.summary": "Consulte a meteorologia de um local, incluindo as condições marítimas e as marés quando disponíveis.",
   "official.weather.help.forecast.title": "Meteorologia e previsões",
   "official.weather.help.forecast.summary": "Mostra a meteorologia atual, um dia de previsão ou um intervalo inclusivo.",
   "official.weather.help.forecast.instruction": "Usa o dia 0 para hoje, 1 para amanhã ou um intervalo como 0-5; as previsões suportam até 15 dias.",

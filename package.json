@@ -1,7 +1,7 @@
 {
   "name": "@wabs/plugin-weather",
-  "version": "0.6.3",
-  "description": "Location-based current weather and forecasts.",
+  "version": "0.6.4",
+  "description": "Shows current weather and forecasts by location with /weather. It also provides marine conditions and tide information for supported Portuguese stations to members and other plugins.",
   "license": "MIT",
   "private": true,
   "type": "commonjs",

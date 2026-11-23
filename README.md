@@ -1,6 +1,6 @@
 # Weather
 
-Current weather, forecasts and marine conditions through `/weather`, a typed assistant tool and the `official.weather.v2` service.
+Shows current weather and forecasts by location with /weather. It also provides marine conditions and tide information for supported Portuguese stations to members and other plugins.
 
 The service has two read methods. `query` returns the normalized data. `present` returns the same data plus the chat text that `/weather` and the assistant send, rendered in the caller's language: one block per day (conditions, temperature and humidity, rain, wind, then tides) and one note naming the tide source and datum. Other plugins, such as Community Events, send that text, so a forecast reads the same everywhere. The `presentation.style` setting chooses emoji icons (the default) or plain text labels.
 
