@@ -1,3 +1,4 @@
+import { withMessageSlot } from './messageSlot';
 import { z } from 'zod';
 import type { PluginCommandContext } from '@wabs/plugin-sdk/command-plugin';
 import {
@@ -93,7 +94,7 @@ function weatherQueryTool(
         return {
           content: {
             ok: false,
-            text: t('official.weather.failed')
+            text: t('official.weather.failed'), ...withMessageSlot('official.weather.failed')
           }
         };
       }

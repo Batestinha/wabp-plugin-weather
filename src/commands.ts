@@ -1,3 +1,4 @@
+import { withMessageSlot } from './messageSlot';
 import type { CommandMetadata } from '@wabs/plugin-sdk/command-metadata';
 import type { CommandContext } from '@wabs/plugin-sdk/commands';
 import { tokenizeArgs } from '@wabs/plugin-sdk/command-parser';
@@ -195,6 +196,6 @@ function weatherCommand(): CommandMetadata {
 function failed(ctx: CommandContext) {
   return {
     handled: true,
-    text: ctx.t('official.weather.failed')
+    text: ctx.t('official.weather.failed'), ...withMessageSlot('official.weather.failed')
   };
 }
