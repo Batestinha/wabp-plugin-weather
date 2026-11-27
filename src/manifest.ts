@@ -13,11 +13,12 @@ const { dependencies, integrations } = require('../wa-plugin.json');
 const relationships = { dependencies, integrations };
 
 export const weatherManifest: PluginManifest = {
+  ...{ operationCatalogVersion: require('../wa-plugin.json').operationCatalogVersion, memberSubscriptions: require('../wa-plugin.json').memberSubscriptions },
   pluginId: WEATHER_PLUGIN_ID,
   kind: 'managed_group',
   ...relationships,
-  version: '0.6.6',
-  coreApiRange: '^0.3.31',
+  version: '0.6.7',
+  coreApiRange: '^0.3.34',
   messageNamespace: 'official.weather',
   descriptionKey: 'official.weather.description',
   defaultMessages: weatherMessages,
