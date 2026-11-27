@@ -10,7 +10,7 @@ assert.ok(Array.isArray(metadata.dependencies));
 assert.ok(Array.isArray(metadata.integrations));
 assert.deepEqual(plugin.manifest.dependencies, metadata.dependencies);
 assert.deepEqual(plugin.manifest.integrations, metadata.integrations);
-assert.equal(plugin.manifest.coreApiRange, '^0.3.31');
+assert.equal(plugin.manifest.coreApiRange, '^0.3.34');
 for (const method of ['registerCommands', 'registerAssistantTools', 'registerServices']) assert.equal(typeof plugin[method], 'function');
 assert.equal(plugin.lifecycle, undefined);
 const pt = JSON.parse(fs.readFileSync(path.join(root, 'locales/pt-PT/official.weather.json')));
