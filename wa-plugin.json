@@ -9,7 +9,7 @@
   "description": "Shows current weather and forecasts by location with /weather. It also provides marine conditions and tide information for supported Portuguese stations to members and other plugins.",
   "kind": "managed_group",
   "version": "0.6.6",
-  "coreApiRange": "^0.3.0",
+  "coreApiRange": "^0.3.31",
   "entrypoint": "dist/index.js",
   "messageNamespace": "official.weather",
   "descriptionKey": "official.weather.description",

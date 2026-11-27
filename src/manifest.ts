@@ -17,7 +17,7 @@ export const weatherManifest: PluginManifest = {
   kind: 'managed_group',
   ...relationships,
   version: '0.6.6',
-  coreApiRange: '^0.3.0',
+  coreApiRange: '^0.3.31',
   messageNamespace: 'official.weather',
   descriptionKey: 'official.weather.description',
   defaultMessages: weatherMessages,
