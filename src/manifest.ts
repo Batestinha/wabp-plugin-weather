@@ -9,10 +9,14 @@ import {
 
 export const WEATHER_PLUGIN_ID = 'official.weather';
 
+const { dependencies, integrations } = require('../wa-plugin.json');
+const relationships = { dependencies, integrations };
+
 export const weatherManifest: PluginManifest = {
   pluginId: WEATHER_PLUGIN_ID,
   kind: 'managed_group',
-  version: '0.6.5',
+  ...relationships,
+  version: '0.6.6',
   coreApiRange: '^0.3.0',
   messageNamespace: 'official.weather',
   descriptionKey: 'official.weather.description',
@@ -53,9 +57,6 @@ export const weatherManifest: PluginManifest = {
   dangerousActions: [],
   backgroundJobs: [],
   cancellation: { workflows: [] },
-  dependencies: [
-    { pluginId: 'official.geocoder', versionRange: '>=0.3.0' }
-  ],
   assistant: {
     summary: 'Location-based current weather and forecasts through one command, one unified query service, and one typed assistant tool.',
     useCases: [
